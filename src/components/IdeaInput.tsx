@@ -2,8 +2,10 @@
 import React from 'react';
 import { FiLock, FiUnlock, FiSend } from 'react-icons/fi';
 import { useAppStore } from '../store/useAppStore';
-import { generateEmbedding, matchIdeas } from '../lib/ai';
+import { matchIdeas } from '../lib/ai';
+import { supabase } from '../lib/supabase';
 import { Idea } from '../types';
+
 
 const IdeaInput: React.FC = () => {
   const {
@@ -15,62 +17,98 @@ const IdeaInput: React.FC = () => {
     setMatchIdeas,
     setShowMatchModal,
     resetNewIdea,
+    author,
+    setAuthor
   } = useAppStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newIdea.title.trim() || !newIdea.content.trim()) {
+    if (!newIdea.title.trim() || !newIdea.content.trim() || !author.trim()) {
       return;
     }
     
-    // Generate embedding for the new idea
-    const embedding = await generateEmbedding(
-      `${newIdea.title} ${newIdea.content} ${newIdea.tags.join(' ')}`
-    );
-    
-    // Create a new idea object
-    const idea: Idea = {
-      id: Date.now().toString(),
-      author_id: [user?.id || '1'],
-      title: newIdea.title,
-      content: newIdea.content,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      is_public: newIdea.isPublic,
-      tags: newIdea.tags,
-      comments_count: 0,
-      likes_count: 0,
-      embedding,
-    };
-    
-    // Match similar ideas
-    const matchedIdeas = await matchIdeas(
-      idea,
-      ideas,
-      user?.id || '1',
-      0.8
-    );
-    
-    if (matchedIdeas.length > 0) {
-      setMatchIdeas(matchedIdeas);
-      setShowMatchModal(true);
-    }
-    
-    // Add the new idea to the list (optimistic update)
-    addIdea({
-      ...idea,
-      authors: [user || {
-        id: '1',
-        name: '李明',
-        email: 'liming@example.com',
-        role: '产品经理',
+    try {
+      // Generate embedding via API call to server
+      const response = await fetch('/api/generate-embedding', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: `${newIdea.title} ${newIdea.content} ${newIdea.tags.join(' ')}`,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate embedding');
+      }
+      
+      const { embedding } = await response.json();
+      
+      // Create a new idea object
+      const idea: Idea = {
+        id: Date.now().toString(),
+        author_id: [author],
+        title: newIdea.title,
+        content: newIdea.content,
         created_at: new Date().toISOString(),
-      }],
-    });
-    
-    // Reset the form
-    resetNewIdea();
+        updated_at: new Date().toISOString(),
+        is_public: newIdea.isPublic,
+        tags: newIdea.tags,
+        comments_count: 0,
+        likes_count: 0,
+        embedding,
+      };
+      
+      // Match similar ideas (now synchronous)
+      const matchedIdeas = matchIdeas(
+        idea,
+        ideas,
+        author,
+        0.8
+      );
+      
+      if (matchedIdeas.length > 0) {
+        setMatchIdeas(matchedIdeas);
+        setShowMatchModal(true);
+      }
+
+      // Persist to Supabase
+      const { data: insertedData, error } = await supabase
+        .from('ideas')
+        .insert({
+          // Let Supabase generate the UUID
+          author_id: [author],
+          title: newIdea.title,
+          content: newIdea.content,
+          is_public: newIdea.isPublic,
+          tags: newIdea.tags,
+          embedding
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error inserting into Supabase:', error);
+        throw error;
+      }
+      
+      // Add the new idea to the list (using the real ID from DB)
+      if (insertedData) {
+        addIdea({
+          ...idea,
+          id: insertedData.id, // Use the real UUID
+          authors: [{ id: author, name: author, email: '', role: '', created_at: new Date().toISOString() }],
+        });
+      }
+      
+      // Reset the form
+      resetNewIdea();
+    } catch (error) {
+      console.error('Error submitting idea:', error);
+      alert('提交灵感时出错，请重试');
+    }
   };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -87,6 +125,21 @@ const IdeaInput: React.FC = () => {
       <h2 className="text-xl font-bold text-gray-800 mb-4">记录你的灵感</h2>
       
       <form onSubmit={handleSubmit} className="flex flex-col flex-1">
+        {/* Author Input */}
+        <div className="mb-3">
+          <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-1">
+            你的名字
+          </label>
+          <input
+            type="text"
+            id="author"
+            placeholder="请输入你的名字"
+            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+          />
+        </div>
+        
         {/* Title Input */}
         <input
           type="text"

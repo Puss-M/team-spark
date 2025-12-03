@@ -7,6 +7,14 @@ export interface User {
   created_at: string;
 }
 
+export interface Note {
+  id: string;
+  content: string;
+  author: string;
+  created_at: string;
+  embedding?: number[];
+}
+
 export interface Idea {
   id: string;
   author_id: string[];

@@ -1,88 +1,55 @@
 'use client';
-import React from 'react';
+import React, { useEffect } from 'react';
 import IdeaCard from './IdeaCard';
 import { useAppStore } from '../store/useAppStore';
+import { supabase } from '../lib/supabase';
 
 const IdeasFeed: React.FC = () => {
-  const { ideas } = useAppStore();
+  const { ideas, fetchIdeas, isLoading } = useAppStore();
 
-  // Mock data for ideas (to be replaced with real data from Supabase)
-  const mockIdeas = [
-    {
-      id: '1',
-      author_id: ['1'],
-      title: '关于Q3用户增长的新路径思考',
-      content: '我们应该重点关注存量用户的激活，结合新功能推出一系列运营活动...',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      is_public: true,
-      tags: ['#增长黑客', '#UI优化'],
-      comments_count: 5,
-      likes_count: 10,
-      embedding: Array(384).fill(0.1),
-      authors: [
-        {
-          id: '1',
-          name: '李明',
-          email: 'liming@example.com',
-          role: '产品经理',
-          created_at: new Date().toISOString(),
-        },
-      ],
-    },
-    {
-      id: '2',
-      author_id: ['1'],
-      title: '关于Q3用户增长的新路径思考',
-      content: '我们应该重点关注存量用户的激活，结合新功能推出一系列运营活动...',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      is_public: true,
-      tags: ['#增长黑客', '#UI优化'],
-      comments_count: 5,
-      likes_count: 10,
-      embedding: Array(384).fill(0.1),
-      authors: [
-        {
-          id: '1',
-          name: '李明',
-          email: 'liming@example.com',
-          role: '产品经理',
-          created_at: new Date().toISOString(),
-        },
-      ],
-    },
-    {
-      id: '3',
-      author_id: ['1'],
-      title: '关于Q3用户增长的新路径思考',
-      content: '我们应该重点关注存量用户的激活，结合新功能推出一系列运营活动...',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      is_public: true,
-      tags: ['#增长黑客', '#UI优化'],
-      comments_count: 5,
-      likes_count: 10,
-      embedding: Array(384).fill(0.1),
-      authors: [
-        {
-          id: '1',
-          name: '李明',
-          email: 'liming@example.com',
-          role: '产品经理',
-          created_at: new Date().toISOString(),
-        },
-      ],
-    },
-  ];
+  // Fetch ideas on component mount
+  useEffect(() => {
+    fetchIdeas();
+    
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('ideas-channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'ideas' },
+        (payload) => {
+          // Fetch latest ideas when a new one is added
+          fetchIdeas();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchIdeas]);
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 p-4 flex items-center justify-center">
+        <div className="text-gray-500">加载中...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 p-4 overflow-y-auto">
       <h2 className="text-xl font-bold text-gray-800 mb-4">灵感流</h2>
       
-      {mockIdeas.map((idea) => (
-        <IdeaCard key={idea.id} idea={idea} />
-      ))}
+      {ideas.length === 0 ? (
+        <div className="text-center text-gray-500 py-8">
+          还没有灵感，快来发布第一个吧！
+        </div>
+      ) : (
+        ideas.map((idea) => (
+          <IdeaCard key={idea.id} idea={idea} />
+        ))
+      )}
     </div>
   );
 };

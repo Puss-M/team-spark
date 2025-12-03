@@ -1,27 +1,5 @@
 import { Idea, MatchIdea, IdeaWithAuthors } from '../types';
 
-// Initialize the text embedding pipeline
-let embedder: any = null;
-
-const initEmbedder = async () => {
-  if (!embedder) {
-    // Use dynamic import to load @xenova/transformers only when needed
-    const { pipeline } = await import('@xenova/transformers');
-    embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-  }
-  return embedder;
-};
-
-// Generate embedding for a text
-export const generateEmbedding = async (text: string): Promise<number[]> => {
-  const embedder = await initEmbedder();
-  const result = await embedder(text, {
-    pooling: 'mean',
-    normalize: true,
-  });
-  return Array.from(result.data);
-};
-
 // Calculate cosine similarity between two embeddings
 export const calculateSimilarity = (embedding1: number[], embedding2: number[]): number => {
   let dotProduct = 0;
@@ -42,16 +20,16 @@ export const calculateSimilarity = (embedding1: number[], embedding2: number[]):
 };
 
 // Match ideas based on embedding similarity
-export const matchIdeas = async (
+// Now expects the newIdea to already have an embedding generated
+export const matchIdeas = (
   newIdea: Idea,
   existingIdeas: IdeaWithAuthors[],
   userId: string,
   threshold: number = 0.8
-): Promise<MatchIdea[]> => {
+): MatchIdea[] => {
   if (!newIdea.embedding) {
-    newIdea.embedding = await generateEmbedding(
-      `${newIdea.title} ${newIdea.content} ${newIdea.tags.join(' ')}`
-    );
+    console.warn('New idea has no embedding, cannot match');
+    return [];
   }
 
   const matches: MatchIdea[] = [];
@@ -61,7 +39,7 @@ export const matchIdeas = async (
     if (idea.author_id.includes(userId)) continue;
     
     if (idea.embedding) {
-      const similarity = calculateSimilarity(newIdea.embedding!, idea.embedding!);
+      const similarity = calculateSimilarity(newIdea.embedding, idea.embedding);
       if (similarity >= threshold) {
         matches.push({
           idea,
