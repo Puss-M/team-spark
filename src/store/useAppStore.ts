@@ -40,10 +40,17 @@ interface AppState {
   isLoading: boolean;
   
   // Match ideas state
+  // View mode state
+  viewMode: 'mine' | 'all';
+  setViewMode: (mode: 'mine' | 'all') => void;
+
+  // Match ideas state
   matchIdeas: MatchIdea[];
+  currentMatchSourceIdea: IdeaWithAuthors | null;
   setMatchIdeas: (ideas: MatchIdea[]) => void;
   showMatchModal: boolean;
   setShowMatchModal: (show: boolean) => void;
+  findMatchesForIdea: (idea: IdeaWithAuthors) => void;
   
   // New idea state
   newIdea: {
@@ -277,12 +284,55 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Loading state
   isLoading: false,
   
+  // View mode state
+  viewMode: 'mine',
+  setViewMode: (mode) => set({ viewMode: mode }),
+
   // Match ideas state
   matchIdeas: [],
+  currentMatchSourceIdea: null,
   setMatchIdeas: (ideas) => set({ matchIdeas: ideas }),
   showMatchModal: false,
   setShowMatchModal: (show) => set({ showMatchModal: show }),
   
+  findMatchesForIdea: (sourceIdea: IdeaWithAuthors) => {
+    const state = get();
+    const allIdeas = state.ideas;
+    
+    // Calculate similarity with all other ideas
+    // Note: In a real app with many ideas, this should be done server-side via RPC
+    // For now, we'll do it client-side since we have the embeddings
+    
+    if (!sourceIdea.embedding) {
+      console.warn('Source idea has no embedding');
+      return;
+    }
+
+    const matches = allIdeas
+      .filter(targetIdea => 
+        targetIdea.id !== sourceIdea.id && // Exclude itself
+        targetIdea.embedding && // Must have embedding
+        !targetIdea.authors.some(a => a.name === state.author) // Exclude my own ideas (find inspiration from OTHERS)
+      )
+      .map(targetIdea => {
+        // Calculate cosine similarity
+        const similarity = calculateSimilarity(sourceIdea.embedding!, targetIdea.embedding!);
+        return {
+          idea: targetIdea,
+          similarity
+        };
+      })
+      .filter(match => match.similarity > 0.5) // Threshold
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 5); // Top 5
+
+    set({ 
+      matchIdeas: matches, 
+      currentMatchSourceIdea: sourceIdea,
+      showMatchModal: true 
+    });
+  },
+
   // New idea state
   newIdea: {
     title: '',
@@ -302,3 +352,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   }),
 }));
+
+// Helper function for cosine similarity
+function calculateSimilarity(vecA: number[], vecB: number[]): number {
+  if (vecA.length !== vecB.length) return 0;
+  
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}

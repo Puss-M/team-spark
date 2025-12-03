@@ -5,7 +5,7 @@ import { useAppStore } from '../store/useAppStore';
 import IdeaCard from './IdeaCard';
 
 const MatchIdeasModal: React.FC = () => {
-  const { matchIdeas, showMatchModal, setShowMatchModal } = useAppStore();
+  const { matchIdeas, showMatchModal, setShowMatchModal, currentMatchSourceIdea } = useAppStore();
 
   if (!showMatchModal) {
     return null;
@@ -17,7 +17,9 @@ const MatchIdeasModal: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">建议讨论</h2>
+            <h2 className="text-xl font-bold text-gray-800">
+              {currentMatchSourceIdea ? `为 "${currentMatchSourceIdea.title}" 找到的灵感` : '建议讨论'}
+            </h2>
             <p className="text-sm text-gray-500 mt-1">
               我们发现了{matchIdeas.length}个相似的想法，建议你与作者进行讨论
             </p>

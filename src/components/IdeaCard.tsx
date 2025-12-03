@@ -11,7 +11,7 @@ interface IdeaCardProps {
 const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const { recallIdea, user, author } = useAppStore();
+  const { recallIdea, findMatchesForIdea, user, author } = useAppStore();
   
   // Check if current user is the author
   const isAuthor = idea.authors.some(a => a.name === author);
@@ -41,6 +41,11 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   const confirmRecall = () => {
     recallIdea(idea);
     setShowDeleteConfirm(false);
+  };
+
+  const handleFindInspiration = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    findMatchesForIdea(idea);
   };
 
   return (
@@ -86,7 +91,6 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
               </div>
             </div>
           </div>
-          {/* Comment icon moved to footer or kept here if needed, but trash icon is top-right now */}
         </div>
 
         {/* Title */}
@@ -127,6 +131,17 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
               <span>{idea.comments_count} 评论</span>
             </button>
           </div>
+          
+          {/* Find Inspiration Button (Only for Author) */}
+          {isAuthor && (
+            <button
+              onClick={handleFindInspiration}
+              className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors"
+            >
+              <span>✨</span>
+              <span>寻找灵感</span>
+            </button>
+          )}
         </div>
       </div>
       
