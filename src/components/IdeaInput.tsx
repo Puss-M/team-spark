@@ -38,22 +38,34 @@ const IdeaInput: React.FC = () => {
     try {
       setIsMatching(true);
       
-      // Generate embedding via API call to server
-      const response = await fetch('/api/generate-embedding', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: `${newIdea.title} ${newIdea.content} ${newIdea.tags.join(' ')}`,
-        }),
-      });
+      // Step 1: Generate embedding via API call to server
+      console.log('📝 步骤 1/3: 生成语义向量...');
+      let embedding: number[];
       
-      if (!response.ok) {
-        throw new Error('Failed to generate embedding');
+      try {
+        const response = await fetch('/api/generate-embedding', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: `${newIdea.title} ${newIdea.content} ${newIdea.tags.join(' ')}`,
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`Embedding 生成失败: ${errorData.error || response.statusText}`);
+        }
+        
+        const data = await response.json();
+        embedding = data.embedding;
+        console.log('✅ Embedding 生成成功，维度:', embedding.length);
+      } catch (error: any) {
+        console.error('❌ Embedding 生成失败:', error);
+        alert(`❌ 步骤 1/3 失败：语义向量生成出错\n\n错误详情: ${error.message}\n\n请检查网络连接或稍后重试`);
+        return;
       }
-      
-      const { embedding } = await response.json();
       
       // Create a new idea object
       const idea: Idea = {
@@ -70,61 +82,91 @@ const IdeaInput: React.FC = () => {
         embedding,
       };
       
-      // Match similar ideas using database RPC
-      console.log('🔍 开始碰撞匹配...');
-      console.log('📊 Embedding 维度:', embedding.length);
+      // Step 2: Match similar ideas using database RPC
+      console.log('🔍 步骤 2/3: 碰撞匹配相似灵感...');
       console.log('👤 当前用户:', author);
       
-      const matchedIdeas = await matchIdeasFromDatabase(
-        embedding,
-        author,
-        0.7, // threshold
-        10   // max results
-      );
-      
-      console.log('✨ 碰撞结果数量:', matchedIdeas.length);
-      if (matchedIdeas.length > 0) {
-        console.log('🎯 匹配到的灵感:', matchedIdeas);
-        setMatchIdeas(matchedIdeas);
-        setShowMatchModal(true);
-      } else {
-        console.log('❌ 没有找到匹配的灵感 (可能是阈值太高或没有其他用户的灵感)');
+      try {
+        const matchedIdeas = await matchIdeasFromDatabase(
+          embedding,
+          author,
+          0.7, // threshold
+          10   // max results
+        );
+        
+        console.log('✨ 碰撞结果数量:', matchedIdeas.length);
+        if (matchedIdeas.length > 0) {
+          console.log('🎯 匹配到的灵感:', matchedIdeas);
+          setMatchIdeas(matchedIdeas);
+          setShowMatchModal(true);
+        } else {
+          console.log('ℹ️ 没有找到匹配的灵感 (可能是阈值太高或没有其他用户的灵感)');
+        }
+      } catch (error: any) {
+        console.warn('⚠️ 碰撞匹配失败（不影响发布）:', error);
+        // 碰撞失败不应该阻止发布，所以只是警告
       }
 
-      // Persist to Supabase
-      const { data: insertedData, error } = await supabase
-        .from('ideas')
-        .insert({
-          // Let Supabase generate the UUID
-          author_id: [author],
-          title: newIdea.title,
-          content: newIdea.content,
-          is_public: newIdea.isPublic,
-          tags: newIdea.tags,
-          embedding
-        })
-        .select()
-        .single();
+      // Step 3: Persist to Supabase
+      console.log('💾 步骤 3/3: 保存到数据库...');
+      
+      try {
+        const { data: insertedData, error } = await supabase
+          .from('ideas')
+          .insert({
+            // Let Supabase generate the UUID
+            author_id: [author],
+            title: newIdea.title,
+            content: newIdea.content,
+            is_public: newIdea.isPublic,
+            tags: newIdea.tags,
+            embedding
+          })
+          .select()
+          .single();
 
-      if (error) {
-        console.error('Error inserting into Supabase:', error);
-        throw error;
+        if (error) {
+          console.error('❌ 数据库插入失败:', error);
+          
+          // 提供更具体的错误信息
+          let errorMessage = '数据库保存失败';
+          
+          if (error.message.includes('permission') || error.message.includes('policy')) {
+            errorMessage = '❌ 步骤 3/3 失败：数据库权限不足\n\n请在 Supabase 中运行 supabase/setup_permissions.sql 脚本来设置权限';
+          } else if (error.message.includes('network') || error.message.includes('fetch')) {
+            errorMessage = '❌ 步骤 3/3 失败：网络连接错误\n\n请检查网络连接并重试';
+          } else {
+            errorMessage = `❌ 步骤 3/3 失败：${error.message}\n\n错误代码: ${error.code || '未知'}`;
+          }
+          
+          alert(errorMessage);
+          return;
+        }
+        
+        console.log('✅ 保存成功！ID:', insertedData?.id);
+        
+        // Add the new idea to the list (using the real ID from DB)
+        if (insertedData) {
+          addIdea({
+            ...idea,
+            id: insertedData.id, // Use the real UUID
+            authors: [{ id: author, name: author, email: '', role: '', created_at: new Date().toISOString() }],
+          });
+        }
+        
+        // Reset the form
+        resetNewIdea();
+        
+        // 成功提示
+        console.log('🎉 灵感发布成功！');
+      } catch (error: any) {
+        console.error('❌ 未预期的错误:', error);
+        alert(`❌ 步骤 3/3 失败：发生未预期的错误\n\n${error.message || '请稍后重试'}`);
+        return;
       }
-      
-      // Add the new idea to the list (using the real ID from DB)
-      if (insertedData) {
-        addIdea({
-          ...idea,
-          id: insertedData.id, // Use the real UUID
-          authors: [{ id: author, name: author, email: '', role: '', created_at: new Date().toISOString() }],
-        });
-      }
-      
-      // Reset the form
-      resetNewIdea();
-    } catch (error) {
-      console.error('Error submitting idea:', error);
-      alert('提交灵感时出错，请重试');
+    } catch (error: any) {
+      console.error('💥 提交失败:', error);
+      alert(`提交失败：${error.message || '未知错误，请重试'}`);
     } finally {
       setIsMatching(false);
     }
