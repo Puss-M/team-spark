@@ -8,40 +8,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     
     if (!apiKey) {
-      console.error("OPENAI_API_KEY is not set");
+      console.error("GEMINI_API_KEY is not set");
       return NextResponse.json(
-        { error: "OpenAI API key is not configured" },
+        { error: "Gemini API key is not configured" },
         { status: 500 }
       );
     }
 
-    // Call OpenAI Embedding API
-    const response = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "text-embedding-3-small",
-        input: text,
-      }),
-    });
+    // Call Google Gemini Embedding API
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "models/text-embedding-004",
+          content: {
+            parts: [{ text }]
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("OpenAI API error:", errorData);
+      console.error("Gemini API error:", errorData);
       return NextResponse.json(
-        { error: `OpenAI API failed: ${errorData.error?.message || response.statusText}` },
+        { error: `Gemini API failed: ${errorData.error?.message || response.statusText}` },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    const embedding = data.data[0].embedding;
+    const embedding = data.embedding.values;
 
     console.log(`✅ Generated embedding with ${embedding.length} dimensions`);
 
