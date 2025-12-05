@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { FiMessageCircle, FiTag, FiClock, FiUser, FiTrash2 } from 'react-icons/fi';
+import { FiMessageCircle, FiTag, FiClock, FiUser, FiTrash2, FiHeart } from 'react-icons/fi';
 import { IdeaWithAuthors } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
@@ -11,7 +11,7 @@ interface IdeaCardProps {
 const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const { recallIdea, findMatchesForIdea, user, author } = useAppStore();
+  const { recallIdea, findMatchesForIdea, toggleLike, user, author } = useAppStore();
   
   // Check if current user is the author
   const isAuthor = idea.authors.some(a => a.name === author);
@@ -46,6 +46,11 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   const handleFindInspiration = (e: React.MouseEvent) => {
     e.stopPropagation();
     findMatchesForIdea(idea);
+  };
+
+  const handleLike = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleLike(idea.id);
   };
 
   return (
@@ -126,6 +131,13 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-gray-100">
           <div className="flex items-center gap-4">
+            <button 
+              onClick={handleLike}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-500 transition-colors"
+            >
+              <FiHeart size={14} />
+              <span>{idea.likes_count} 点赞</span>
+            </button>
             <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">
               <FiMessageCircle size={14} />
               <span>{idea.comments_count} 评论</span>
@@ -236,6 +248,13 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
 
             {/* Footer */}
             <div className="flex items-center gap-4 pt-4 border-t border-slate-700">
+              <button 
+                onClick={handleLike}
+                className="flex items-center gap-1 text-sm text-gray-400 hover:text-red-400 transition-colors"
+              >
+                <FiHeart size={16} />
+                <span>{idea.likes_count} 点赞</span>
+              </button>
               <button className="flex items-center gap-1 text-sm text-gray-400 hover:text-white transition-colors">
                 <FiMessageCircle size={16} />
                 <span>{idea.comments_count} 评论</span>

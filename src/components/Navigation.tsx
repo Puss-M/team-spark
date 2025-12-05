@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FiSearch, FiFilter, FiChevronDown, FiTrendingUp, FiUsers, FiPlus } from 'react-icons/fi';
 import { useAppStore } from '../store/useAppStore';
 
@@ -11,9 +11,16 @@ const Navigation: React.FC = () => {
     setSortBy,
     selectedGroup,
     setSelectedGroup,
+    groups,
+    fetchGroups,
   } = useAppStore();
 
-  const groups = [
+  // Fetch groups on mount
+  useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups]);
+
+  const menuItems = [
     { id: 'hot', name: '热门', icon: <FiTrendingUp className="mr-2" /> },
     { id: 'my-groups', name: '我的小组', icon: <FiUsers className="mr-2" /> },
     { id: 'create-group', name: '创建小组', icon: <FiPlus className="mr-2" /> },
@@ -42,25 +49,25 @@ const Navigation: React.FC = () => {
       </div>
 
       {/* Main Navigation */}
-      <nav className="space-y-2">
+      <nav className="space-y-2 flex-1 overflow-y-auto">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-semibold text-gray-500 uppercase">浏览</span>
         </div>
 
-        {/* Group Items */}
+        {/* Menu Items */}
         <div className="space-y-1">
-          {groups.map((group) => (
+          {menuItems.map((item) => (
             <button
-              key={group.id}
-              onClick={() => setSelectedGroup(group.id)}
+              key={item.id}
+              onClick={() => setSelectedGroup(item.id)}
               className={`flex items-center w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedGroup === group.id
+                selectedGroup === item.id
                   ? 'bg-blue-50 text-blue-600'
                   : 'text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {group.icon}
-              {group.name}
+              {item.icon}
+              {item.name}
             </button>
           ))}
         </div>
@@ -98,17 +105,27 @@ const Navigation: React.FC = () => {
         <div className="mt-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-gray-500 uppercase">我的小组</span>
+            <span className="text-xs text-gray-400">({groups.length})</span>
           </div>
           <div className="space-y-1">
-            <button className="flex items-center w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-              # 产品设计组
-            </button>
-            <button className="flex items-center w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-              # 市场营销制暴
-            </button>
-            <button className="flex items-center w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-              # 技术探索
-            </button>
+            {groups.length === 0 ? (
+              <p className="text-sm text-gray-400 px-3 py-2">暂无小组</p>
+            ) : (
+              groups.map((group) => (
+                <button
+                  key={group.id}
+                  onClick={() => setSelectedGroup(group.id)}
+                  className={`flex items-center w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    selectedGroup === group.id
+                      ? 'bg-blue-50 text-blue-600'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                  title={group.description}
+                >
+                  <span className="truncate"># {group.name}</span>
+                </button>
+              ))
+            )}
           </div>
         </div>
       </nav>

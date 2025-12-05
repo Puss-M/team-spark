@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Idea, IdeaWithAuthors, MatchIdea, User, Note } from '../types';
+import { Idea, IdeaWithAuthors, MatchIdea, User, Note, Group } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface AppState {
@@ -36,6 +36,11 @@ interface AppState {
   selectedTags: string[];
   setSelectedTags: (tags: string[]) => void;
   
+  // Groups state
+  groups: Group[];
+  setGroups: (groups: Group[]) => void;
+  fetchGroups: () => Promise<void>;
+  
   // Loading state
   isLoading: boolean;
   
@@ -61,6 +66,9 @@ interface AppState {
   };
   setNewIdea: (idea: Partial<AppState['newIdea']>) => void;
   resetNewIdea: () => void;
+  
+  // Like functionality
+  toggleLike: (ideaId: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -281,6 +289,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedTags: [],
   setSelectedTags: (tags) => set({ selectedTags: tags }),
   
+  // Groups state
+  groups: [],
+  setGroups: (groups) => set({ groups }),
+  fetchGroups: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('idea_groups')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      set({ groups: data || [] });
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+    }
+  },
+  
   // Loading state
   isLoading: false,
   
@@ -351,6 +377,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       tags: [],
     }
   }),
+  
+  // Like functionality
+  toggleLike: async (ideaId: string) => {
+    // Optimistic update
+    set((state) => ({
+      ideas: state.ideas.map((idea) =>
+        idea.id === ideaId
+          ? { ...idea, likes_count: idea.likes_count + 1 }
+          : idea
+      )
+    }));
+    
+    // TODO: Implement actual like/unlike in Supabase
+    // For now, just increment locally
+  },
 }));
 
 // Helper function for cosine similarity
