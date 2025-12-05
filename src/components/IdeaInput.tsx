@@ -23,6 +23,7 @@ const IdeaInput: React.FC = () => {
 
   // Local state for loading during collision matching
   const [isMatching, setIsMatching] = useState(false);
+  const [isExtractingTags, setIsExtractingTags] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,19 +247,80 @@ const IdeaInput: React.FC = () => {
           onChange={handleContentChange}
         />
         
-        {/* Tags Preview */}
+        {/* Tags Preview with Remove */}
         {newIdea.tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
             {newIdea.tags.map((tag, index) => (
               <span
                 key={index}
-                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600"
               >
                 {tag}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newTags = newIdea.tags.filter((_, i) => i !== index);
+                    setNewIdea({ tags: newTags });
+                  }}
+                  className="hover:bg-blue-100 rounded-full p-0.5"
+                >
+                  ×
+                </button>
               </span>
             ))}
           </div>
         )}
+        
+        {/* Suggest Tags Button */}
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={async () => {
+              if (!newIdea.title && !newIdea.content) {
+                alert('请先输入标题或内容');
+                return;
+              }
+              
+              setIsExtractingTags(true);
+              try {
+                const response = await fetch('/api/extract-tags', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    title: newIdea.title,
+                    content: newIdea.content
+                  })
+                });
+                
+                if (!response.ok) throw new Error('标签提取失败');
+                
+                const { tags } = await response.json();
+                // Merge with existing tags, remove duplicates
+                const allTags = [...new Set([...newIdea.tags, ...tags])];
+                setNewIdea({ tags: allTags });
+              } catch (error: any) {
+                console.error('Tag extraction error:', error);
+                alert('标签建议失败：' + error.message);
+              } finally {
+                setIsExtractingTags(false);
+              }
+            }}
+            disabled={isExtractingTags}
+            className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isExtractingTags ? (
+              <>
+                <span className="animate-spin">⏳</span>
+                <span>建议中...</span>
+              </>
+            ) : (
+              <>
+                <span>💡</span>
+                <span>建议标签</span>
+              </>
+            )}
+          </button>
+        </div>
         
         {/* Permission Selection */}
         <div className="flex items-center justify-between mb-4">
