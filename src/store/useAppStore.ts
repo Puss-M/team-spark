@@ -8,6 +8,9 @@ interface AppState {
   setUser: (user: User | null) => void;
   author: string;
   setAuthor: (author: string) => void;
+  login: (name: string) => void;
+  logout: () => void;
+  isLoggedIn: boolean;
   
   // Ideas state
   ideas: IdeaWithAuthors[];
@@ -75,8 +78,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // User state
   user: null,
   setUser: (user) => set({ user }),
-  // Initialize author with a fallback for SSR
-  author: '',
+  // Initialize author from localStorage on first load
+  author: typeof window !== 'undefined' ? (localStorage.getItem('author') || '') : '',
   setAuthor: (author) => {
     set({ author });
     // Only use localStorage in browser environment
@@ -84,6 +87,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       localStorage.setItem('author', author);
     }
   },
+  // Login function
+  login: (name: string) => {
+    const trimmedName = name.trim();
+    set({ author: trimmedName, isLoggedIn: true });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('author', trimmedName);
+      localStorage.setItem('isLoggedIn', 'true');
+    }
+  },
+  // Logout function
+  logout: () => {
+    set({ author: '', isLoggedIn: false });
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('author');
+      localStorage.removeItem('isLoggedIn');
+    }
+  },
+  // Check if user is logged in from localStorage
+  isLoggedIn: typeof window !== 'undefined' ? localStorage.getItem('isLoggedIn') === 'true' : false,
   
   // Ideas state
   ideas: [],

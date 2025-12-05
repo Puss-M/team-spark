@@ -268,21 +268,6 @@ const IdeaInput: React.FC = () => {
       <h2 className="text-xl font-bold text-gray-800 mb-4">记录你的灵感</h2>
       
       <form onSubmit={handleSubmit} className="flex flex-col flex-1">
-        {/* Author Input */}
-        <div className="mb-3">
-          <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-1">
-            你的名字
-          </label>
-          <input
-            type="text"
-            id="author"
-            placeholder="请输入你的名字"
-            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-          />
-        </div>
-        
         {/* Title Input */}
         <input
           type="text"

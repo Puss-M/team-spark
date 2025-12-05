@@ -1,6 +1,6 @@
 'use client';
-import React, { useEffect } from 'react';
-import { FiSearch, FiFilter, FiChevronDown, FiTrendingUp, FiUsers, FiPlus } from 'react-icons/fi';
+import React, { useEffect, useState } from 'react';
+import { FiSearch, FiFilter, FiChevronDown, FiTrendingUp, FiUsers, FiPlus, FiLogOut } from 'react-icons/fi';
 import { useAppStore } from '../store/useAppStore';
 
 const Navigation: React.FC = () => {
@@ -13,7 +13,11 @@ const Navigation: React.FC = () => {
     setSelectedGroup,
     groups,
     fetchGroups,
+    author,
+    logout,
   } = useAppStore();
+
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Fetch groups on mount
   useEffect(() => {
@@ -129,6 +133,60 @@ const Navigation: React.FC = () => {
           </div>
         </div>
       </nav>
+      
+      {/* User Profile Section */}
+      <div className="mt-auto pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+              <span className="text-blue-600 font-medium text-sm">
+                {author.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700">{author}</p>
+              <p className="text-xs text-gray-400">已登录</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+            title="退出登录"
+          >
+            <FiLogOut size={16} />
+          </button>
+        </div>
+      </div>
+      
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowLogoutConfirm(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">确认退出登录？</h3>
+            <p className="text-gray-500 mb-6">
+              退出后需要重新输入名字才能继续使用。
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  logout();
+                  setShowLogoutConfirm(false);
+                }}
+                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors font-medium flex items-center gap-2"
+              >
+                <FiLogOut size={16} />
+                确定退出
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
