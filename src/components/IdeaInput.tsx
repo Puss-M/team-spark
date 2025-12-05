@@ -4,7 +4,8 @@ import { FiLock, FiUnlock, FiSend } from 'react-icons/fi';
 import { useAppStore } from '../store/useAppStore';
 import { matchIdeasFromDatabase } from '../lib/ai';
 import { supabase } from '../lib/supabase';
-import { Idea } from '../types';
+import { Idea, IdeaWithAuthors } from '../types';
+import GroupCreationDialog from './GroupCreationDialog';
 
 
 const IdeaInput: React.FC = () => {
@@ -24,6 +25,11 @@ const IdeaInput: React.FC = () => {
   // Local state for loading during collision matching
   const [isMatching, setIsMatching] = useState(false);
   const [isExtractingTags, setIsExtractingTags] = useState(false);
+  
+  // Group creation dialog state
+  const [showGroupDialog, setShowGroupDialog] = useState(false);
+  const [pendingGroupIdeas, setPendingGroupIdeas] = useState<IdeaWithAuthors[]>([]);
+  const [pendingSourceIdea, setPendingSourceIdea] = useState<{title: string; content: string; tags: string[]} | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,12 +115,24 @@ const IdeaInput: React.FC = () => {
         );
         
         console.log('✨ 碰撞结果数量:', matchedIdeas.length);
-        if (matchedIdeas.length > 0) {
-          console.log('🎯 匹配到的灵感:', matchedIdeas);
+        
+        if (matchedIdeas.length >= 2) {
+          // Multiple matches - suggest group creation
+          console.log('🎯 发现多个匹配，建议创建小组');
+          setPendingGroupIdeas(matchedIdeas as IdeaWithAuthors[]);
+          setPendingSourceIdea({
+            title: newIdea.title,
+            content: newIdea.content,
+            tags: newIdea.tags
+          });
+          setShowGroupDialog(true);
+        } else if (matchedIdeas.length === 1) {
+          // Single match - show traditional match modal
+          console.log('🎯 匹配到 1 个灵感');
           setMatchIdeas(matchedIdeas);
           setShowMatchModal(true);
         } else {
-          console.log('ℹ️ 没有找到匹配的灵感 (可能是阈值太高或没有其他用户的灵感)');
+          console.log('ℹ️ 没有找到匹配的灵感');
         }
       } catch (error: any) {
         console.warn('⚠️ 碰撞匹配失败（不影响发布）:', error);
@@ -208,6 +226,41 @@ const IdeaInput: React.FC = () => {
     // Extract tags from content (starting with #)
     const tags = content.match(/#[\w\u4e00-\u9fa5]+/g) || [];
     setNewIdea({ tags });
+  };
+
+  // Handle group creation
+  const handleGroupCreation = async (groupName: string) => {
+    try {
+      // Create group in database
+      const { data: groupData, error: groupError } = await supabase
+        .from('idea_groups')
+        .insert({
+          name: groupName,
+          description: `由${pendingGroupIdeas.length + 1}个相似灵感组成的协作小组`
+        })
+        .select()
+        .single();
+
+      if (groupError) {
+        console.error('Group creation error:', groupError);
+        alert('小组创建失败：' + groupError.message);
+        return;
+      }
+
+      console.log('✅ 小组创建成功:', groupData);
+
+      // TODO: Add ideas to group  
+      // 这部分需要在灵感创建完成后再添加到小组
+      
+      setShowGroupDialog(false);
+      setPendingGroupIdeas([]);
+      setPendingSourceIdea(null);
+      
+      alert(`🎉 小组 "${groupName}" 创建成功！`);
+    } catch (error: any) {
+      console.error('Error creating group:', error);
+      alert('创建小组时出错：' + error.message);
+    }
   };
 
   return (
@@ -384,6 +437,20 @@ const IdeaInput: React.FC = () => {
           )}
         </button>
       </form>
+      
+      {/* Group Creation Dialog */}
+      {showGroupDialog && pendingSourceIdea && (
+        <GroupCreationDialog
+          matchedIdeas={pendingGroupIdeas}
+          sourceIdea={pendingSourceIdea}
+          onConfirm={handleGroupCreation}
+          onCancel={() => {
+            setShowGroupDialog(false);
+            setPendingGroupIdeas([]);
+            setPendingSourceIdea(null);
+          }}
+        />
+      )}
       
       {/* Collision Result Preview */}
       <div className="mt-6 p-3 bg-white rounded-lg border border-gray-200">
