@@ -1,6 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { FiMessageCircle, FiTag, FiClock, FiUser, FiTrash2, FiHeart } from 'react-icons/fi';
+import { FaHeart } from 'react-icons/fa'; // Filled heart for liked state
 import { IdeaWithAuthors } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
@@ -133,9 +134,17 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
           <div className="flex items-center gap-4">
             <button 
               onClick={handleLike}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-500 transition-colors"
+              className={`flex items-center gap-1 text-xs transition-colors ${
+                idea.liked_by_user 
+                  ? 'text-red-500 hover:text-red-600' 
+                  : 'text-gray-500 hover:text-red-500'
+              }`}
             >
-              <FiHeart size={14} />
+              {idea.liked_by_user ? (
+                <FaHeart size={14} />
+              ) : (
+                <FiHeart size={14} />
+              )}
               <span>{idea.likes_count} 点赞</span>
             </button>
             <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">
@@ -250,9 +259,17 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
             <div className="flex items-center gap-4 pt-4 border-t border-slate-700">
               <button 
                 onClick={handleLike}
-                className="flex items-center gap-1 text-sm text-gray-400 hover:text-red-400 transition-colors"
+                className={`flex items-center gap-1 text-sm transition-colors ${
+                  idea.liked_by_user
+                    ? 'text-red-400 hover:text-red-500'
+                    : 'text-gray-400 hover:text-red-400'
+                }`}
               >
-                <FiHeart size={16} />
+                {idea.liked_by_user ? (
+                  <FaHeart size={16} />
+                ) : (
+                  <FiHeart size={16} />
+                )}
                 <span>{idea.likes_count} 点赞</span>
               </button>
               <button className="flex items-center gap-1 text-sm text-gray-400 hover:text-white transition-colors">
