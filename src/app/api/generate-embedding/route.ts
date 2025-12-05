@@ -8,44 +8,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.SILICONFLOW_API_KEY;
     
     if (!apiKey) {
-      console.error("GEMINI_API_KEY is not set");
+      console.error("SILICONFLOW_API_KEY is not set");
       return NextResponse.json(
-        { error: "Gemini API key is not configured" },
+        { error: "SiliconFlow API key is not configured" },
         { status: 500 }
       );
     }
 
-    // Call Google Gemini Embedding API
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "models/text-embedding-004",
-          content: {
-            parts: [{ text }]
-          },
-        }),
-      }
-    );
+    // Call SiliconFlow Embedding API (OpenAI-compatible)
+    const response = await fetch("https://api.siliconflow.cn/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "BAAI/bge-large-zh-v1.5",
+        input: text,
+        encoding_format: "float",
+      }),
+    });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("Gemini API error:", errorData);
+      console.error("SiliconFlow API error:", errorData);
       return NextResponse.json(
-        { error: `Gemini API failed: ${errorData.error?.message || response.statusText}` },
+        { error: `SiliconFlow API failed: ${errorData.error?.message || response.statusText}` },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    const embedding = data.embedding.values;
+    const embedding = data.data[0].embedding;
 
     console.log(`✅ Generated embedding with ${embedding.length} dimensions`);
 
