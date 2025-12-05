@@ -38,6 +38,9 @@ const IdeaInput: React.FC = () => {
     try {
       setIsMatching(true);
       
+      // Create temporary ID for optimistic update
+      const tempId = `temp-${Date.now()}`;
+      
       // Step 1: Generate embedding via API call to server
       console.log('📝 步骤 1/3: 生成语义向量...');
       let embedding: number[];
@@ -67,9 +70,9 @@ const IdeaInput: React.FC = () => {
         return;
       }
       
-      // Create a new idea object
-      const idea: Idea = {
-        id: Date.now().toString(),
+      // Create a new idea object for optimistic update
+      const optimisticIdea: Idea = {
+        id: tempId,
         author_id: [author],
         title: newIdea.title,
         content: newIdea.content,
@@ -81,6 +84,16 @@ const IdeaInput: React.FC = () => {
         likes_count: 0,
         embedding,
       };
+      
+      // 🚀 OPTIMISTIC UPDATE: Add to UI immediately
+      console.log('⚡ 乐观更新：立即显示灵感到 Feed');
+      addIdea({
+        ...optimisticIdea,
+        authors: [{ id: author, name: author, email: '', role: '', created_at: new Date().toISOString() }],
+      });
+      
+      // Reset form immediately for better UX
+      resetNewIdea();
       
       // Step 2: Match similar ideas using database RPC
       console.log('🔍 步骤 2/3: 碰撞匹配相似灵感...');
@@ -128,6 +141,13 @@ const IdeaInput: React.FC = () => {
         if (error) {
           console.error('❌ 数据库插入失败:', error);
           
+          // 🔄 ROLLBACK: Remove optimistic update on error
+          console.log('⚠️ 回滚：移除乐观更新的灵感');
+          const { ideas } = useIdeasStore.getState();
+          useIdeasStore.setState({
+            ideas: ideas.filter(i => i.id !== tempId)
+          });
+          
           // 提供更具体的错误信息
           let errorMessage = '数据库保存失败';
           
@@ -145,22 +165,30 @@ const IdeaInput: React.FC = () => {
         
         console.log('✅ 保存成功！ID:', insertedData?.id);
         
-        // Add the new idea to the list (using the real ID from DB)
+        // ✨ UPDATE: Replace temp ID with real ID from database
         if (insertedData) {
-          addIdea({
-            ...idea,
-            id: insertedData.id, // Use the real UUID
-            authors: [{ id: author, name: author, email: '', role: '', created_at: new Date().toISOString() }],
+          console.log('🔄 更新：用真实 ID 替换临时 ID');
+          const { ideas } = useIdeasStore.getState();
+          useIdeasStore.setState({
+            ideas: ideas.map(i => 
+              i.id === tempId 
+                ? { ...i, id: insertedData.id }
+                : i
+            )
           });
         }
-        
-        // Reset the form
-        resetNewIdea();
         
         // 成功提示
         console.log('🎉 灵感发布成功！');
       } catch (error: any) {
         console.error('❌ 未预期的错误:', error);
+        
+        // 🔄 ROLLBACK: Remove optimistic update on error
+        const { ideas } = useIdeasStore.getState();
+        useIdeasStore.setState({
+          ideas: ideas.filter(i => i.id !== tempId)
+        });
+        
         alert(`❌ 步骤 3/3 失败：发生未预期的错误\n\n${error.message || '请稍后重试'}`);
         return;
       }
