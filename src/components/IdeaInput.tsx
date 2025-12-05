@@ -1,8 +1,8 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { FiLock, FiUnlock, FiSend } from 'react-icons/fi';
 import { useAppStore } from '../store/useAppStore';
-import { matchIdeas } from '../lib/ai';
+import { matchIdeasFromDatabase } from '../lib/ai';
 import { supabase } from '../lib/supabase';
 import { Idea } from '../types';
 
@@ -21,14 +21,23 @@ const IdeaInput: React.FC = () => {
     setAuthor
   } = useAppStore();
 
+  // Local state for loading during collision matching
+  const [isMatching, setIsMatching] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!newIdea.title.trim() || !newIdea.content.trim() || !author.trim()) {
       return;
     }
+
+    if (isMatching) {
+      return; // Prevent duplicate submissions
+    }
     
     try {
+      setIsMatching(true);
+      
       // Generate embedding via API call to server
       const response = await fetch('/api/generate-embedding', {
         method: 'POST',
@@ -61,17 +70,25 @@ const IdeaInput: React.FC = () => {
         embedding,
       };
       
-      // Match similar ideas (now synchronous)
-      const matchedIdeas = matchIdeas(
-        idea,
-        ideas,
+      // Match similar ideas using database RPC
+      console.log('🔍 开始碰撞匹配...');
+      console.log('📊 Embedding 维度:', embedding.length);
+      console.log('👤 当前用户:', author);
+      
+      const matchedIdeas = await matchIdeasFromDatabase(
+        embedding,
         author,
-        0.8
+        0.7, // threshold
+        10   // max results
       );
       
+      console.log('✨ 碰撞结果数量:', matchedIdeas.length);
       if (matchedIdeas.length > 0) {
+        console.log('🎯 匹配到的灵感:', matchedIdeas);
         setMatchIdeas(matchedIdeas);
         setShowMatchModal(true);
+      } else {
+        console.log('❌ 没有找到匹配的灵感 (可能是阈值太高或没有其他用户的灵感)');
       }
 
       // Persist to Supabase
@@ -108,6 +125,8 @@ const IdeaInput: React.FC = () => {
     } catch (error) {
       console.error('Error submitting idea:', error);
       alert('提交灵感时出错，请重试');
+    } finally {
+      setIsMatching(false);
     }
   };
 
@@ -213,10 +232,24 @@ const IdeaInput: React.FC = () => {
         {/* Submit Button */}
         <button
           type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+          disabled={isMatching}
+          className={`w-full font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+            isMatching
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
+          }`}
         >
-          发布并碰撞灵感
-          <FiSend size={16} />
+          {isMatching ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              正在碰撞灵感...
+            </>
+          ) : (
+            <>
+              发布并碰撞灵感
+              <FiSend size={16} />
+            </>
+          )}
         </button>
       </form>
       

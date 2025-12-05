@@ -54,3 +54,69 @@ export const matchIdeas = (
 
   return matches;
 };
+
+// Database-level matching using Supabase RPC for efficient vector search
+export const matchIdeasFromDatabase = async (
+  embedding: number[],
+  currentAuthor: string,
+  threshold: number = 0.7,
+  limit: number = 10
+): Promise<MatchIdea[]> => {
+  console.log('📡 调用数据库匹配 RPC...');
+  console.log('参数:', { threshold, limit, currentAuthor, embeddingLength: embedding.length });
+  
+  try {
+    const { supabase } = await import('./supabase');
+    
+    // Call the RPC function
+    const { data, error } = await supabase.rpc('match_ideas_by_embedding', {
+      query_embedding: embedding,
+      match_threshold: threshold,
+      match_count: limit,
+      current_author: currentAuthor
+    });
+
+    if (error) {
+      console.error('❌ RPC 调用失败:', error);
+      throw error;
+    }
+
+    console.log('✅ RPC 调用成功，返回数据:', data);
+
+    if (!data || data.length === 0) {
+      console.log('ℹ️ 数据库没有返回匹配结果');
+      return [];
+    }
+
+    // Transform the RPC result to MatchIdea format
+    const matches: MatchIdea[] = data.map((item: any) => ({
+      idea: {
+        id: item.id,
+        author_id: item.author_id,
+        title: item.title,
+        content: item.content,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        is_public: item.is_public,
+        tags: item.tags || [],
+        comments_count: 0,
+        likes_count: 0,
+        authors: item.author_id.map((name: string) => ({
+          id: name,
+          name: name,
+          email: '',
+          role: '',
+          created_at: new Date().toISOString()
+        }))
+      },
+      similarity: item.similarity
+    }));
+
+    console.log('🎉 成功转换为 MatchIdea 格式，数量:', matches.length);
+    return matches;
+  } catch (error) {
+    console.error('💥 数据库匹配失败:', error);
+    return [];
+  }
+};
+
