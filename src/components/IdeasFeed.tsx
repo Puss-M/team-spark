@@ -5,7 +5,7 @@ import { useAppStore } from '../store/useAppStore';
 import { supabase } from '../lib/supabase';
 
 const IdeasFeed: React.FC = () => {
-  const { ideas, fetchIdeas, isLoading, viewMode, setViewMode, author } = useAppStore();
+  const { ideas, fetchIdeas, isLoading, viewMode, setViewMode, sortBy, author } = useAppStore();
 
   // Fetch ideas on component mount
   useEffect(() => {
@@ -29,9 +29,23 @@ const IdeasFeed: React.FC = () => {
     };
   }, [fetchIdeas]);
 
+  // Filter by view mode (mine vs all)
   const filteredIdeas = viewMode === 'mine' 
     ? ideas.filter(idea => idea.authors.some(a => a.name === author))
     : ideas;
+
+  // Sort by sortBy (latest vs popular)
+  const sortedIdeas = [...filteredIdeas].sort((a, b) => {
+    if (sortBy === 'popular') {
+      // Sort by hotness: likes_count + comments_count
+      const hotnessA = a.likes_count + a.comments_count;
+      const hotnessB = b.likes_count + b.comments_count;
+      return hotnessB - hotnessA; // Descending order
+    } else {
+      // Sort by latest (default)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+  });
 
   if (isLoading) {
     return (
@@ -71,7 +85,7 @@ const IdeasFeed: React.FC = () => {
         </div>
       </div>
       
-      {filteredIdeas.length === 0 ? (
+      {sortedIdeas.length === 0 ? (
         <div className="text-center text-gray-500 py-12 bg-gray-50 rounded-lg border border-dashed border-gray-200">
           {viewMode === 'mine' ? (
             <>
@@ -84,7 +98,7 @@ const IdeasFeed: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredIdeas.map((idea) => (
+          {sortedIdeas.map((idea) => (
             <IdeaCard key={idea.id} idea={idea} />
           ))}
         </div>
