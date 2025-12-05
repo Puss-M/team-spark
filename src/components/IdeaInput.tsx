@@ -119,7 +119,7 @@ const IdeaInput: React.FC = () => {
         if (matchedIdeas.length >= 2) {
           // Multiple matches - suggest group creation
           console.log('🎯 发现多个匹配，建议创建小组');
-          setPendingGroupIdeas(matchedIdeas as IdeaWithAuthors[]);
+          setPendingGroupIdeas(matchedIdeas.map(m => m.idea));
           setPendingSourceIdea({
             title: newIdea.title,
             content: newIdea.content,
@@ -162,8 +162,8 @@ const IdeaInput: React.FC = () => {
           
           // 🔄 ROLLBACK: Remove optimistic update on error
           console.log('⚠️ 回滚：移除乐观更新的灵感');
-          const { ideas } = useIdeasStore.getState();
-          useIdeasStore.setState({
+          const { ideas } = useAppStore.getState();
+          useAppStore.setState({
             ideas: ideas.filter(i => i.id !== tempId)
           });
           
@@ -187,8 +187,8 @@ const IdeaInput: React.FC = () => {
         // ✨ UPDATE: Replace temp ID with real ID from database
         if (insertedData) {
           console.log('🔄 更新：用真实 ID 替换临时 ID');
-          const { ideas } = useIdeasStore.getState();
-          useIdeasStore.setState({
+          const { ideas } = useAppStore.getState();
+          useAppStore.setState({
             ideas: ideas.map(i => 
               i.id === tempId 
                 ? { ...i, id: insertedData.id }
@@ -203,8 +203,8 @@ const IdeaInput: React.FC = () => {
         console.error('❌ 未预期的错误:', error);
         
         // 🔄 ROLLBACK: Remove optimistic update on error
-        const { ideas } = useIdeasStore.getState();
-        useIdeasStore.setState({
+        const { ideas } = useAppStore.getState();
+        useAppStore.setState({
           ideas: ideas.filter(i => i.id !== tempId)
         });
         

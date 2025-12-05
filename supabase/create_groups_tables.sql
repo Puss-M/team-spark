@@ -23,12 +23,14 @@ CREATE TABLE IF NOT EXISTS group_idea_members (
 ALTER TABLE idea_groups ENABLE ROW LEVEL SECURITY;
 
 -- 4. 创建 RLS 策略 - 所有人可以读取
+DROP POLICY IF EXISTS "Anyone can read groups" ON idea_groups;
 CREATE POLICY "Anyone can read groups"
 ON idea_groups
 FOR SELECT
 USING (true);
 
 -- 5. 创建 RLS 策略 - 所有人可以创建小组
+DROP POLICY IF EXISTS "Anyone can create groups" ON idea_groups;
 CREATE POLICY "Anyone can create groups"
 ON idea_groups
 FOR INSERT
@@ -38,12 +40,14 @@ WITH CHECK (true);
 ALTER TABLE group_idea_members ENABLE ROW LEVEL SECURITY;
 
 -- 7. 创建 RLS 策略 - 所有人可以读取成员关系
+DROP POLICY IF EXISTS "Anyone can read group members" ON group_idea_members;
 CREATE POLICY "Anyone can read group members"
 ON group_idea_members
 FOR SELECT
 USING (true);
 
 -- 8. 创建 RLS 策略 - 所有人可以添加成员
+DROP POLICY IF EXISTS "Anyone can add group members" ON group_idea_members;
 CREATE POLICY "Anyone can add group members"
 ON group_idea_members
 FOR INSERT
