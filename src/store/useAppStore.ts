@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Idea, IdeaWithAuthors, MatchIdea, User, Note } from '../types';
+import { Idea, IdeaWithAuthors, MatchIdea, User, Note, Group } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface AppState {
@@ -8,6 +8,9 @@ interface AppState {
   setUser: (user: User | null) => void;
   author: string;
   setAuthor: (author: string) => void;
+  login: (name: string) => void;
+  logout: () => void;
+  isLoggedIn: boolean;
   
   // Ideas state
   ideas: IdeaWithAuthors[];
@@ -36,6 +39,11 @@ interface AppState {
   selectedTags: string[];
   setSelectedTags: (tags: string[]) => void;
   
+  // Groups state
+  groups: Group[];
+  setGroups: (groups: Group[]) => void;
+  fetchGroups: () => Promise<void>;
+  
   // Loading state
   isLoading: boolean;
   
@@ -61,14 +69,17 @@ interface AppState {
   };
   setNewIdea: (idea: Partial<AppState['newIdea']>) => void;
   resetNewIdea: () => void;
+  
+  // Like functionality
+  toggleLike: (ideaId: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
   // User state
   user: null,
   setUser: (user) => set({ user }),
-  // Initialize author with a fallback for SSR
-  author: '',
+  // Initialize author from localStorage on first load
+  author: typeof window !== 'undefined' ? (localStorage.getItem('author') || '') : '',
   setAuthor: (author) => {
     set({ author });
     // Only use localStorage in browser environment
@@ -76,6 +87,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       localStorage.setItem('author', author);
     }
   },
+  // Login function
+  login: (name: string) => {
+    const trimmedName = name.trim();
+    set({ author: trimmedName, isLoggedIn: true });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('author', trimmedName);
+      localStorage.setItem('isLoggedIn', 'true');
+    }
+  },
+  // Logout function
+  logout: () => {
+    set({ author: '', isLoggedIn: false });
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('author');
+      localStorage.removeItem('isLoggedIn');
+    }
+  },
+  // Check if user is logged in from localStorage
+  isLoggedIn: typeof window !== 'undefined' ? localStorage.getItem('isLoggedIn') === 'true' : false,
   
   // Ideas state
   ideas: [],
@@ -89,6 +119,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   fetchIdeas: async () => {
     set({ isLoading: true });
     try {
+      const state = get();
+      const { author } = state;
+      
       console.log('Fetching ideas from Supabase...');
       const { data, error } = await supabase
         .from('ideas')
@@ -102,12 +135,40 @@ export const useAppStore = create<AppState>((set, get) => ({
       
       console.log('Fetched ideas:', data);
       
-      // Convert to IdeaWithAuthors format (simplified for now)
-      const ideasWithAuthors: IdeaWithAuthors[] = (data || []).map(idea => ({
-        ...idea,
-        authors: [{ id: idea.author_id[0], name: idea.author_id[0], email: '', role: '', created_at: '' }]
-      }));
-      set({ ideas: ideasWithAuthors });
+      // For each idea, get likes count and check if current user liked it
+      const ideasWithLikes: IdeaWithAuthors[] = await Promise.all(
+        (data || []).map(async (idea) => {
+          // Get likes count
+          const { data: likesData, error: likesError } = await supabase
+            .from('idea_likes')
+            .select('*', { count: 'exact', head: false })
+            .eq('idea_id', idea.id);
+          
+          const likesCount = likesData?.length || 0;
+          
+          // Check if current user liked this idea
+          let likedByUser = false;
+          if (author) {
+            const { data: userLike } = await supabase
+              .from('idea_likes')
+              .select('*')
+              .eq('idea_id', idea.id)
+              .eq('user_name', author)
+              .maybeSingle();
+            
+            likedByUser = !!userLike;
+          }
+          
+          return {
+            ...idea,
+            likes_count: likesCount,
+            liked_by_user: likedByUser,
+            authors: [{ id: idea.author_id[0], name: idea.author_id[0], email: '', role: '', created_at: '' }]
+          };
+        })
+      );
+      
+      set({ ideas: ideasWithLikes });
     } catch (error) {
       console.error('Error fetching ideas:', error);
     } finally {
@@ -281,6 +342,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedTags: [],
   setSelectedTags: (tags) => set({ selectedTags: tags }),
   
+  // Groups state
+  groups: [],
+  setGroups: (groups) => set({ groups }),
+  fetchGroups: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('idea_groups')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      set({ groups: data || [] });
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+    }
+  },
+  
   // Loading state
   isLoading: false,
   
@@ -351,6 +430,76 @@ export const useAppStore = create<AppState>((set, get) => ({
       tags: [],
     }
   }),
+  
+  // Like functionality
+  toggleLike: async (ideaId: string) => {
+    const state = get();
+    const { author } = state;
+    
+    if (!author) {
+      alert('请先登录');
+      return;
+    }
+
+    // Find the idea
+    const idea = state.ideas.find(i => i.id === ideaId);
+    if (!idea) return;
+
+    const isLiked = idea.liked_by_user || false;
+
+    // Optimistic update
+    set((state) => ({
+      ideas: state.ideas.map((i) =>
+        i.id === ideaId
+          ? { 
+              ...i, 
+              likes_count: isLiked ? i.likes_count - 1 : i.likes_count + 1,
+              liked_by_user: !isLiked
+            }
+          : i
+      )
+    }));
+
+    try {
+      if (isLiked) {
+        // Unlike: delete the like record
+        const { error } = await supabase
+          .from('idea_likes')
+          .delete()
+          .eq('idea_id', ideaId)
+          .eq('user_name', author);
+
+        if (error) throw error;
+      } else {
+        // Like: insert a new like record
+        const { error } = await supabase
+          .from('idea_likes')
+          .insert({
+            idea_id: ideaId,
+            user_name: author
+          });
+
+        if (error) throw error;
+      }
+    } catch (error: any) {
+      console.error('Error toggling like:', error);
+      
+      // Rollback optimistic update on error
+      set((state) => ({
+        ideas: state.ideas.map((i) =>
+          i.id === ideaId
+            ? { 
+                ...i, 
+                likes_count: isLiked ? i.likes_count + 1 : i.likes_count - 1,
+                liked_by_user: isLiked
+              }
+            : i
+        )
+      }));
+      
+      alert('点赞操作失败：' + error.message);
+    }
+  },
 }));
 
 // Helper function for cosine similarity

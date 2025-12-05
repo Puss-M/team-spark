@@ -1,15 +1,5 @@
 import { NextResponse } from "next/server";
 
-let embedder: any = null;
-
-const initEmbedder = async () => {
-  if (!embedder) {
-    const { pipeline } = await import("@xenova/transformers");
-    embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-  }
-  return embedder;
-};
-
 export async function POST(request: Request) {
   try {
     const { text } = await request.json();
@@ -18,21 +8,49 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });
     }
 
-    // Initialize embedder and generate embedding
-    const embedder = await initEmbedder();
-    const result = await embedder(text, {
-      pooling: "mean",
-      normalize: true,
+    const apiKey = process.env.SILICONFLOW_API_KEY;
+    
+    if (!apiKey) {
+      console.error("SILICONFLOW_API_KEY is not set");
+      return NextResponse.json(
+        { error: "SiliconFlow API key is not configured" },
+        { status: 500 }
+      );
+    }
+
+    // Call SiliconFlow Embedding API (OpenAI-compatible)
+    const response = await fetch("https://api.siliconflow.cn/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "BAAI/bge-large-zh-v1.5",
+        input: text,
+        encoding_format: "float",
+      }),
     });
 
-    // Convert to array
-    const embedding = Array.from(result.data);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error("SiliconFlow API error:", errorData);
+      return NextResponse.json(
+        { error: `SiliconFlow API failed: ${errorData.error?.message || response.statusText}` },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    const embedding = data.data[0].embedding;
+
+    console.log(`✅ Generated embedding with ${embedding.length} dimensions`);
 
     return NextResponse.json({ embedding });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error generating embedding:", error);
     return NextResponse.json(
-      { error: "Failed to generate embedding" },
+      { error: `Failed to generate embedding: ${error.message}` },
       { status: 500 }
     );
   }

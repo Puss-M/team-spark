@@ -27,6 +27,7 @@ export interface Idea {
   comments_count: number;
   likes_count: number;
   embedding?: number[];
+  liked_by_user?: boolean; // Whether current user has liked this idea
 }
 
 export interface Comment {
