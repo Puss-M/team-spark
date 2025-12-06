@@ -139,10 +139,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       const { author } = state;
       
       console.log('Fetching ideas from Supabase...');
-      const { data, error } = await supabase
+      
+      let query = supabase
         .from('ideas')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Apply visibility filter
+      if (author) {
+        // Show: Public ideas OR Private ideas where author matches current user
+        // Using author_id.cs.{name} to check if array contains name
+        query = query.or(`is_public.eq.true,author_id.cs.{${author}}`);
+      } else {
+        // Not logged in: Show only public ideas
+        query = query.eq('is_public', true);
+      }
+
+      const { data, error } = await query;
       
       if (error) {
         console.error('Supabase error details:', error);
