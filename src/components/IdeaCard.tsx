@@ -196,27 +196,27 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
       {/* Expanded Modal */}
       {isExpanded && !showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out">
-          <div className="bg-slate-900 text-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto transition-all duration-300 ease-in-out transform scale-100 opacity-100">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto shadow-2xl transition-all duration-300 ease-in-out transform scale-100 opacity-100">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center">
-                  <span className="text-white font-medium text-lg">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-medium text-lg">
                     {idea.authors[0].name.charAt(0)}
                   </span>
                 </div>
                 <div>
                   <div className="flex items-center gap-1">
-                    <span className="text-white font-medium">
+                    <span className="text-gray-900 font-medium">
                       {idea.authors[0].name}
                     </span>
                     {idea.authors.length > 1 && (
-                      <span className="text-gray-400">
+                      <span className="text-gray-500">
                         +{idea.authors.length - 1}
                       </span>
                     )}
-                    <span className="text-gray-400">({idea.authors[0].role})</span>
+                    <span className="text-gray-500">({idea.authors[0].role})</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                     <FiClock size={12} />
                     <span>{formatRelativeTime(idea.created_at)}</span>
                   </div>
@@ -224,14 +224,14 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
               </div>
               <button 
                 onClick={() => setIsExpanded(false)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <span className="text-2xl">✕</span>
               </button>
             </div>
 
             {/* Title */}
-            <h3 className="text-2xl font-bold text-white mb-4">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">
               {idea.title}
             </h3>
 
@@ -240,7 +240,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
               {idea.tags.map((tag, index) => (
                 <span
                   key={index}
-                  className="flex items-center gap-1 text-xs bg-blue-900 text-blue-200 px-3 py-1 rounded-full"
+                  className="flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full"
                 >
                   <FiTag size={10} />
                   <span>{tag}</span>
@@ -250,13 +250,13 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
 
             {/* Content */}
             <div className="mb-6">
-              <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+              <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-lg">
                 {idea.content}
               </p>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-4 pt-4 border-t border-slate-700">
+            <div className="flex items-center gap-4 pt-4 border-t border-gray-100">
               <button 
                 onClick={handleLike}
                 className={`flex items-center gap-1 text-sm transition-colors ${
