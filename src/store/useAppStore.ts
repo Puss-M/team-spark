@@ -540,7 +540,15 @@ export const useAppStore = create<AppState>((set, get) => ({
             user_name: author
           });
 
-        if (error) throw error;
+        if (error) {
+          // Check for unique key violation (already liked)
+          if (error.code === '23505') {
+            console.log('Already liked in DB, treating as success');
+            // Do not throw, keep the optimistic update
+          } else {
+            throw error;
+          }
+        }
       }
     } catch (error: any) {
       console.error('Error toggling like:', error);
@@ -779,9 +787,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating social group:', error);
-      alert('创建小组失败');
+      alert('创建小组失败: ' + (error.message || '请检查网络或权限'));
       return false;
     }
   },
