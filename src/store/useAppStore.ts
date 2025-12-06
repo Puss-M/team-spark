@@ -76,6 +76,7 @@ interface AppState {
   // Comments functionality
   comments: { [ideaId: string]: Comment[] };
   fetchComments: (ideaId: string) => Promise<void>;
+  addComment: (ideaId: string, content: string) => Promise<void>;
   deleteComment: (commentId: string, ideaId: string) => Promise<void>;
 
   // Social Groups functionality
