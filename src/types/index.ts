@@ -38,6 +38,32 @@ export interface Comment {
   created_at: string;
 }
 
+// Social Group Types
+export interface SocialGroup {
+  id: string;
+  name: string;
+  description: string;
+  created_by: string;
+  created_at: string;
+  invite_code: string;
+}
+
+export interface SocialGroupMember {
+  id: string;
+  group_id: string;
+  user_name: string;
+  role: 'owner' | 'admin' | 'member';
+  joined_at: string;
+}
+
+export interface SocialGroupMessage {
+  id: string;
+  group_id: string;
+  user_name: string;
+  content: string;
+  created_at: string;
+}
+
 export interface Group {
   id: string;
   name: string;

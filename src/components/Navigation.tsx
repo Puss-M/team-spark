@@ -1,7 +1,9 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { FiSearch, FiFilter, FiChevronDown, FiTrendingUp, FiUsers, FiPlus, FiLogOut } from 'react-icons/fi';
+import { FiSearch, FiFilter, FiChevronDown, FiTrendingUp, FiUsers, FiPlus, FiLogOut, FiMessageSquare } from 'react-icons/fi';
 import { useAppStore } from '../store/useAppStore';
+import CreateGroupModal from './CreateGroupModal';
+import JoinGroupModal from './JoinGroupModal';
 
 const Navigation: React.FC = () => {
   const {
@@ -11,23 +13,27 @@ const Navigation: React.FC = () => {
     setSortBy,
     selectedGroup,
     setSelectedGroup,
-    groups,
-    fetchGroups,
+    socialGroups,
+    fetchUserSocialGroups,
+    activeSocialGroupId,
+    setActiveSocialGroupId,
     author,
     logout,
   } = useAppStore();
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showJoinGroup, setShowJoinGroup] = useState(false);
 
   // Fetch groups on mount
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
+    fetchUserSocialGroups();
+  }, [fetchUserSocialGroups, author]);
 
   const menuItems = [
     { id: 'hot', name: '热门', icon: <FiTrendingUp className="mr-2" /> },
-    { id: 'my-groups', name: '我的小组', icon: <FiUsers className="mr-2" /> },
-    { id: 'create-group', name: '创建小组', icon: <FiPlus className="mr-2" /> },
+    { id: 'create-group', name: '创建小组', icon: <FiPlus className="mr-2" />, action: () => setShowCreateGroup(true) },
+    { id: 'join-group', name: '加入小组', icon: <FiUsers className="mr-2" />, action: () => setShowJoinGroup(true) },
   ];
 
   return (
@@ -63,9 +69,16 @@ const Navigation: React.FC = () => {
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setSelectedGroup(item.id)}
+              onClick={() => {
+                if (item.action) {
+                  item.action();
+                } else {
+                  setSelectedGroup(item.id);
+                  setActiveSocialGroupId(null); // Switch back to feed
+                }
+              }}
               className={`flex items-center w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedGroup === item.id
+                selectedGroup === item.id && !activeSocialGroupId
                   ? 'bg-blue-50 text-blue-600'
                   : 'text-gray-700 hover:bg-gray-50'
               }`}
@@ -105,28 +118,37 @@ const Navigation: React.FC = () => {
           </div>
         </div>
 
-        {/* User's Groups */}
+        {/* User's Social Groups */}
         <div className="mt-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-gray-500 uppercase">我的小组</span>
-            <span className="text-xs text-gray-400">({groups.length})</span>
+            <span className="text-xs text-gray-400">({socialGroups.length})</span>
           </div>
           <div className="space-y-1">
-            {groups.length === 0 ? (
-              <p className="text-sm text-gray-400 px-3 py-2">暂无小组</p>
+            {socialGroups.length === 0 ? (
+              <div className="text-center py-4 px-2 bg-gray-50 rounded-lg">
+                <p className="text-xs text-gray-500 mb-2">还未加入任何小组</p>
+                <button 
+                  onClick={() => setShowJoinGroup(true)}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  输入邀请码加入
+                </button>
+              </div>
             ) : (
-              groups.map((group) => (
+              socialGroups.map((group) => (
                 <button
                   key={group.id}
-                  onClick={() => setSelectedGroup(group.id)}
+                  onClick={() => setActiveSocialGroupId(group.id)}
                   className={`flex items-center w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectedGroup === group.id
+                    activeSocialGroupId === group.id
                       ? 'bg-blue-50 text-blue-600'
                       : 'text-gray-700 hover:bg-gray-50'
                   }`}
                   title={group.description}
                 >
-                  <span className="truncate"># {group.name}</span>
+                  <FiMessageSquare className="mr-2" size={14} />
+                  <span className="truncate">{group.name}</span>
                 </button>
               ))
             )}
@@ -187,6 +209,8 @@ const Navigation: React.FC = () => {
           </div>
         </div>
       )}
+      {showCreateGroup && <CreateGroupModal onClose={() => setShowCreateGroup(false)} />}
+      {showJoinGroup && <JoinGroupModal onClose={() => setShowJoinGroup(false)} />}
     </div>
   );
 };

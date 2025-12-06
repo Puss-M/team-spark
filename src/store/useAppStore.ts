@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Idea, IdeaWithAuthors, MatchIdea, User, Note, Group, Comment } from '../types';
+import { Idea, IdeaWithAuthors, MatchIdea, User, Note, Group, Comment, SocialGroup, SocialGroupMember, SocialGroupMessage } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface AppState {
@@ -76,8 +76,18 @@ interface AppState {
   // Comments functionality
   comments: { [ideaId: string]: Comment[] };
   fetchComments: (ideaId: string) => Promise<void>;
-  addComment: (ideaId: string, content: string) => Promise<void>;
   deleteComment: (commentId: string, ideaId: string) => Promise<void>;
+
+  // Social Groups functionality
+  socialGroups: SocialGroup[];
+  activeSocialGroupId: string | null;
+  groupMessages: { [groupId: string]: SocialGroupMessage[] };
+  setActiveSocialGroupId: (groupId: string | null) => void;
+  fetchUserSocialGroups: () => Promise<void>;
+  createSocialGroup: (name: string, description: string) => Promise<boolean>;
+  joinSocialGroup: (inviteCode: string) => Promise<{ success: boolean; message: string }>;
+  fetchSocialGroupMessages: (groupId: string) => Promise<void>;
+  sendGroupMessage: (groupId: string, content: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -675,6 +685,194 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
       
       alert('删除评论失败：' + error.message);
+    }
+  },
+
+  // Social Grpups Implementation
+  socialGroups: [],
+  activeSocialGroupId: null,
+  groupMessages: {},
+  
+  setActiveSocialGroupId: (groupId) => set({ activeSocialGroupId: groupId }),
+  
+  fetchUserSocialGroups: async () => {
+    const { author } = get();
+    if (!author) return;
+    
+    try {
+      // 1. Get group IDs user belongs to
+      const { data: members, error: memberError } = await supabase
+        .from('social_group_members')
+        .select('group_id')
+        .eq('user_name', author);
+        
+      if (memberError) throw memberError;
+      
+      const groupIds = members.map(m => m.group_id);
+      
+      if (groupIds.length === 0) {
+        set({ socialGroups: [] });
+        return;
+      }
+      
+      // 2. Fetch group details
+      const { data: groups, error: groupError } = await supabase
+        .from('social_groups')
+        .select('*')
+        .in('id', groupIds)
+        .order('created_at', { ascending: false });
+        
+      if (groupError) throw groupError;
+      
+      set({ socialGroups: groups || [] });
+    } catch (error) {
+      console.error('Error fetching social groups:', error);
+    }
+  },
+  
+  createSocialGroup: async (name: string, description: string) => {
+    const { author } = get();
+    if (!author) return false;
+    
+    try {
+      // 1. Create group
+      const { data: group, error: groupError } = await supabase
+        .from('social_groups')
+        .insert({
+          name,
+          description,
+          created_by: author
+        })
+        .select()
+        .single();
+        
+      if (groupError) throw groupError;
+      
+      // 2. Add creator as member (owner)
+      const { error: memberError } = await supabase
+        .from('social_group_members')
+        .insert({
+          group_id: group.id,
+          user_name: author,
+          role: 'owner'
+        });
+        
+      if (memberError) throw memberError;
+      
+      // Update local state
+      set(state => ({
+        socialGroups: [group, ...state.socialGroups],
+        activeSocialGroupId: group.id
+      }));
+      
+      return true;
+    } catch (error) {
+      console.error('Error creating social group:', error);
+      alert('创建小组失败');
+      return false;
+    }
+  },
+  
+  joinSocialGroup: async (inviteCode: string) => {
+    const { author } = get();
+    if (!author) return { success: false, message: '请先登录' };
+    
+    try {
+      // Call RPC function
+      const { data, error } = await supabase
+        .rpc('join_group_by_code', {
+          user_name: author,
+          invite_code: inviteCode
+        });
+        
+      if (error) throw error;
+      
+      if (data.success) {
+        // Refresh groups
+        await get().fetchUserSocialGroups();
+        set({ activeSocialGroupId: data.group_id });
+        return { success: true, message: '加入成功' };
+      } else {
+        return { success: false, message: data.message };
+      }
+    } catch (error: any) {
+      console.error('Error joining group:', error);
+      return { success: false, message: error.message || '加入失败' };
+    }
+  },
+  
+  fetchSocialGroupMessages: async (groupId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('social_group_messages')
+        .select('*')
+        .eq('group_id', groupId)
+        .order('created_at', { ascending: true });
+        
+      if (error) throw error;
+      
+      set(state => ({
+        groupMessages: {
+          ...state.groupMessages,
+          [groupId]: data || []
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  },
+  
+  sendGroupMessage: async (groupId: string, content: string) => {
+    const { author } = get();
+    if (!author) return;
+    
+    // Optimistic update
+    const tempId = Date.now().toString();
+    const newMessage: SocialGroupMessage = {
+      id: tempId,
+      group_id: groupId,
+      user_name: author,
+      content,
+      created_at: new Date().toISOString()
+    };
+    
+    set(state => ({
+      groupMessages: {
+        ...state.groupMessages,
+        [groupId]: [...(state.groupMessages[groupId] || []), newMessage]
+      }
+    }));
+    
+    try {
+      const { data, error } = await supabase
+        .from('social_group_messages')
+        .insert({
+          group_id: groupId,
+          user_name: author,
+          content
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      // Update with real message
+      set(state => ({
+        groupMessages: {
+          ...state.groupMessages,
+          [groupId]: state.groupMessages[groupId].map(m => m.id === tempId ? data : m)
+        }
+      }));
+    } catch (error) {
+      console.error('Error sending message:', error);
+       // Rollback
+       set(state => ({
+        groupMessages: {
+          ...state.groupMessages,
+          [groupId]: state.groupMessages[groupId].filter(m => m.id !== tempId)
+        }
+      }));
+      alert('发送消息失败');
     }
   },
 }));

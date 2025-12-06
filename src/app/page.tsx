@@ -6,6 +6,7 @@ import IdeaInput from '../components/IdeaInput';
 import MatchIdeasModal from '../components/MatchIdeasModal';
 import LoginModal from '../components/LoginModal';
 import MobileBottomNav from '../components/MobileBottomNav';
+import GroupChatView from '../components/GroupChatView';
 import { useAppStore } from '../store/useAppStore';
 
 const Home: React.FC = () => {
@@ -35,9 +36,9 @@ const Home: React.FC = () => {
           <Navigation />
         </div>
         
-        {/* Idea Feed */}
+        {/* Idea Feed or Group Chat */}
         <div className="flex-1 h-full overflow-y-auto">
-          <IdeasFeed />
+          {useAppStore.getState().activeSocialGroupId ? <GroupChatView /> : <IdeasFeed />}
         </div>
         
         {/* Idea Input */}
