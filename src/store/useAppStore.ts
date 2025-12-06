@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Idea, IdeaWithAuthors, MatchIdea, User, Note, Group } from '../types';
+import { Idea, IdeaWithAuthors, MatchIdea, User, Note, Group, Comment } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface AppState {
@@ -72,6 +72,12 @@ interface AppState {
   
   // Like functionality
   toggleLike: (ideaId: string) => Promise<void>;
+  
+  // Comments functionality
+  comments: { [ideaId: string]: Comment[] };
+  fetchComments: (ideaId: string) => Promise<void>;
+  addComment: (ideaId: string, content: string) => Promise<void>;
+  deleteComment: (commentId: string, ideaId: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -530,6 +536,145 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
       
       alert('点赞操作失败：' + error.message);
+    }
+  },
+
+  // Comments functionality
+  comments: {},
+  
+  fetchComments: async (ideaId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('idea_id', ideaId)
+        .order('created_at', { ascending: true });
+        
+      if (error) throw error;
+      
+      set((state) => ({
+        comments: {
+          ...state.comments,
+          [ideaId]: data || []
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    }
+  },
+  
+  addComment: async (ideaId: string, content: string) => {
+    const state = get();
+    const { author } = state;
+    
+    if (!author) {
+      alert('请先登录');
+      return;
+    }
+    
+    // Optimistic update
+    const tempId = Date.now().toString();
+    const newComment: Comment = {
+      id: tempId,
+      idea_id: ideaId,
+      user_name: author,
+      content,
+      created_at: new Date().toISOString()
+    };
+    
+    set((state) => ({
+      comments: {
+        ...state.comments,
+        [ideaId]: [...(state.comments[ideaId] || []), newComment]
+      },
+      // Optimistically update idea comment count
+      ideas: state.ideas.map(idea => 
+        idea.id === ideaId 
+          ? { ...idea, comments_count: (idea.comments_count || 0) + 1 } 
+          : idea
+      )
+    }));
+    
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .insert({
+          idea_id: ideaId,
+          user_name: author,
+          content
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      // Update with real comment data
+      set((state) => ({
+        comments: {
+          ...state.comments,
+          [ideaId]: state.comments[ideaId].map(c => c.id === tempId ? data : c)
+        }
+      }));
+    } catch (error: any) {
+      console.error('Error adding comment:', error);
+      
+      // Rollback
+      set((state) => ({
+        comments: {
+          ...state.comments,
+          [ideaId]: state.comments[ideaId].filter(c => c.id !== tempId)
+        },
+        ideas: state.ideas.map(idea => 
+          idea.id === ideaId 
+            ? { ...idea, comments_count: (idea.comments_count || 1) - 1 } 
+            : idea
+        )
+      }));
+      
+      alert('评论失败：' + error.message);
+    }
+  },
+  
+  deleteComment: async (commentId: string, ideaId: string) => {
+    // Optimistic update
+    const previousComments = get().comments[ideaId] || [];
+    
+    set((state) => ({
+      comments: {
+        ...state.comments,
+        [ideaId]: state.comments[ideaId].filter(c => c.id !== commentId)
+      },
+      ideas: state.ideas.map(idea => 
+        idea.id === ideaId 
+          ? { ...idea, comments_count: (idea.comments_count || 1) - 1 } 
+          : idea
+      )
+    }));
+    
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', commentId);
+        
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Error deleting comment:', error);
+      
+      // Rollback
+      set((state) => ({
+        comments: {
+          ...state.comments,
+          [ideaId]: previousComments
+        },
+        ideas: state.ideas.map(idea => 
+          idea.id === ideaId 
+            ? { ...idea, comments_count: (idea.comments_count || 0) + 1 } 
+            : idea
+        )
+      }));
+      
+      alert('删除评论失败：' + error.message);
     }
   },
 }));

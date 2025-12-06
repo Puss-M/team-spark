@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { FiMessageCircle, FiTag, FiClock, FiUser, FiTrash2, FiHeart } from 'react-icons/fi';
+import { FiMessageCircle, FiTag, FiClock, FiUser, FiTrash2, FiHeart, FiSend } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa'; // Filled heart for liked state
 import { IdeaWithAuthors } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -12,7 +12,32 @@ interface IdeaCardProps {
 const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const { recallIdea, findMatchesForIdea, toggleLike, user, author } = useAppStore();
+  const { recallIdea, findMatchesForIdea, toggleLike, user, author, comments, fetchComments, addComment, deleteComment } = useAppStore();
+  const [commentContent, setCommentContent] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  // Load comments when expanded
+  React.useEffect(() => {
+    if (isExpanded) {
+      fetchComments(idea.id);
+    }
+  }, [isExpanded, idea.id]);
+
+  const handleAddComment = async () => {
+    if (!commentContent.trim()) return;
+    setIsSubmittingComment(true);
+    await addComment(idea.id, commentContent);
+    setCommentContent('');
+    setIsSubmittingComment(false);
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (confirm('确定要删除这条评论吗？')) {
+      await deleteComment(commentId, idea.id);
+    }
+  };
+
+  const ideaComments = comments[idea.id] || [];
   
   // Check if current user is the author
   const isAuthor = idea.authors.some(a => a.name === author);
@@ -256,7 +281,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center gap-4 pt-4 border-t border-gray-100 mb-6">
               <button 
                 onClick={handleLike}
                 className={`flex items-center gap-1 text-sm transition-colors ${
@@ -272,10 +297,79 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
                 )}
                 <span>{idea.likes_count} 点赞</span>
               </button>
-              <button className="flex items-center gap-1 text-sm text-gray-400 hover:text-white transition-colors">
+              <button className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors">
                 <FiMessageCircle size={16} />
                 <span>{idea.comments_count} 评论</span>
               </button>
+            </div>
+
+            {/* Comments Section */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <FiMessageCircle />
+                评论 ({ideaComments.length})
+              </h4>
+
+              {/* Comment Input */}
+              <div className="flex gap-2 mb-6">
+                <input
+                  type="text"
+                  placeholder={author ? "写下你的想法..." : "请先登录"}
+                  className="flex-1 px-4 py-2 rounded-full border border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                  value={commentContent}
+                  onChange={(e) => setCommentContent(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+                  disabled={!author || isSubmittingComment}
+                />
+                <button
+                  onClick={handleAddComment}
+                  disabled={!author || !commentContent.trim() || isSubmittingComment}
+                  className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <FiSend size={16} />
+                </button>
+              </div>
+
+              {/* Comments List */}
+              <div className="space-y-4">
+                {ideaComments.length === 0 ? (
+                  <p className="text-center text-gray-400 text-sm py-4">
+                    暂无评论，快来抢沙发吧~
+                  </p>
+                ) : (
+                  ideaComments.map((comment) => (
+                    <div key={comment.id} className="flex gap-3 group/comment">
+                      <div className="w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-gray-500 text-xs font-medium">
+                          {comment.user_name.charAt(0)}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-900">
+                            {comment.user_name}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {formatRelativeTime(comment.created_at)}
+                          </span>
+                        </div>
+                        <p className="text-gray-600 text-sm mt-1">
+                          {comment.content}
+                        </p>
+                      </div>
+                      {/* Delete button (only for comment author) */}
+                      {author === comment.user_name && (
+                        <button
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="text-gray-400 hover:text-red-500 opacity-0 group-hover/comment:opacity-100 transition-opacity"
+                        >
+                          <FiTrash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
