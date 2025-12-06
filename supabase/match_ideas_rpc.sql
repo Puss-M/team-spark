@@ -5,7 +5,8 @@ CREATE OR REPLACE FUNCTION match_ideas_by_embedding(
   query_embedding vector(384),
   match_threshold float DEFAULT 0.7,
   match_count int DEFAULT 10,
-  current_author text DEFAULT ''
+  current_author text DEFAULT '',
+  match_idea_id uuid DEFAULT NULL
 )
 RETURNS TABLE (
   id uuid,
@@ -35,8 +36,10 @@ BEGIN
   FROM ideas
   WHERE 
     1 - (ideas.embedding <=> query_embedding) > match_threshold
-    AND NOT (current_author = ANY(ideas.author_id))
     AND ideas.is_public = true
+    AND (match_idea_id IS NULL OR ideas.id != match_idea_id)
+    -- Optional: Uncomment if you strictly want to exclude user's own ideas from matching
+    -- AND (current_author = '' OR NOT (current_author = ANY(ideas.author_id)))
   ORDER BY similarity DESC
   LIMIT match_count;
 END;

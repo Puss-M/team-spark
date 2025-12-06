@@ -78,8 +78,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // User state
   user: null,
   setUser: (user) => set({ user }),
-  // Initialize author from localStorage on first load
-  author: typeof window !== 'undefined' ? (localStorage.getItem('author') || '') : '',
+  // Initialize with default values on server, will be updated on client mount
+  author: '',
   setAuthor: (author) => {
     set({ author });
     // Only use localStorage in browser environment
@@ -104,8 +104,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       localStorage.removeItem('isLoggedIn');
     }
   },
-  // Check if user is logged in from localStorage
-  isLoggedIn: typeof window !== 'undefined' ? localStorage.getItem('isLoggedIn') === 'true' : false,
+  // Initialize with default values on server, will be updated on client mount
+  isLoggedIn: false,
   
   // Ideas state
   ideas: [],
@@ -134,6 +134,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       
       console.log('Fetched ideas:', data);
+      
+      // Log embedding information for debugging
+      (data || []).forEach((idea, index) => {
+        console.log(`Idea ${index} - ID: ${idea.id}, Has embedding: ${!!idea.embedding}, Embedding length: ${idea.embedding?.length || 0}`);
+      });
       
       // For each idea, get likes count and check if current user liked it
       const ideasWithLikes: IdeaWithAuthors[] = await Promise.all(
@@ -164,6 +169,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             likes_count: likesCount,
             liked_by_user: likedByUser,
             authors: [{ id: idea.author_id[0], name: idea.author_id[0], email: '', role: '', created_at: '' }]
+            // Keep the embedding from the database
           };
         })
       );
@@ -189,7 +195,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         tags: [],
         comments_count: 0,
         likes_count: 0,
-        authors: [{ id: author, name: author, email: '', role: '', created_at: '' }]
+        authors: [{ id: author, name: author, email: '', role: '', created_at: '' }],
+        // Set embedding to undefined initially, will be updated after fetch
+        embedding: undefined
       };
       
       get().addIdea(newIdea);
@@ -374,42 +382,66 @@ export const useAppStore = create<AppState>((set, get) => ({
   showMatchModal: false,
   setShowMatchModal: (show) => set({ showMatchModal: show }),
   
-  findMatchesForIdea: (sourceIdea: IdeaWithAuthors) => {
+  findMatchesForIdea: async (sourceIdea: IdeaWithAuthors) => {
     const state = get();
-    const allIdeas = state.ideas;
-    
-    // Calculate similarity with all other ideas
-    // Note: In a real app with many ideas, this should be done server-side via RPC
-    // For now, we'll do it client-side since we have the embeddings
+    const { author } = state;
     
     if (!sourceIdea.embedding) {
       console.warn('Source idea has no embedding');
       return;
     }
 
-    const matches = allIdeas
-      .filter(targetIdea => 
-        targetIdea.id !== sourceIdea.id && // Exclude itself
-        targetIdea.embedding && // Must have embedding
-        !targetIdea.authors.some(a => a.name === state.author) // Exclude my own ideas (find inspiration from OTHERS)
-      )
-      .map(targetIdea => {
-        // Calculate cosine similarity
-        const similarity = calculateSimilarity(sourceIdea.embedding!, targetIdea.embedding!);
-        return {
-          idea: targetIdea,
-          similarity
-        };
-      })
-      .filter(match => match.similarity > 0.5) // Threshold
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, 5); // Top 5
+    try {
+      console.log('Finding matches via RPC...');
+      // @ts-ignore - RPC types might not be fully updated
+      const { data, error } = await supabase.rpc('match_ideas_by_embedding', {
+        query_embedding: sourceIdea.embedding,
+        match_threshold: 0.6, // 降低阈值以展示更多相关想法
+        match_count: 5,
+        current_author: author || '',
+        match_idea_id: sourceIdea.id
+      });
 
-    set({ 
-      matchIdeas: matches, 
-      currentMatchSourceIdea: sourceIdea,
-      showMatchModal: true 
-    });
+      if (error) throw error;
+
+      if (!data) {
+        set({ 
+          matchIdeas: [], 
+          currentMatchSourceIdea: sourceIdea,
+          showMatchModal: true 
+        });
+        return;
+      }
+
+      // Transform RPC result to MatchIdea format
+      // Note: We need to map RPC result to MatchIdea structure
+      const matches: MatchIdea[] = data.map((item: any) => ({
+        idea: {
+          ...item,
+          // Add default values for missing fields if necessary
+          author_id: item.author_id || [],
+          authors: [{ 
+            id: item.author_id ? item.author_id[0] : 'unknown', 
+            name: item.author_id ? item.author_id[0] : 'Unknown', 
+            email: '', 
+            role: '', 
+            created_at: '' 
+          }],
+          likes_count: 0, // RPC might not return this, or we need to update RPC
+          comments_count: 0
+        },
+        similarity: item.similarity
+      }));
+
+      set({ 
+        matchIdeas: matches, 
+        currentMatchSourceIdea: sourceIdea,
+        showMatchModal: true 
+      });
+    } catch (error) {
+      console.error('Error finding matches:', error);
+      alert('寻找灵感失败，请稍后重试');
+    }
   },
 
   // New idea state

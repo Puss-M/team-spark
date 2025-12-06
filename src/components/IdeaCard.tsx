@@ -195,8 +195,8 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
       
       {/* Expanded Modal */}
       {isExpanded && !showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 text-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out">
+          <div className="bg-slate-900 text-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto transition-all duration-300 ease-in-out transform scale-100 opacity-100">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center">

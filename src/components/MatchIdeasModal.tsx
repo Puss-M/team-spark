@@ -12,8 +12,8 @@ const MatchIdeasModal: React.FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto transition-all duration-300 ease-in-out transform scale-100 opacity-100">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -35,53 +35,60 @@ const MatchIdeasModal: React.FC = () => {
         {/* Similar Ideas */}
         <div className="p-6">
           <div className="space-y-4">
-            {matchIdeas.map((match, index) => (
-              <div key={match.idea.id} className="border border-blue-200 rounded-lg p-4 bg-blue-50">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 font-medium">
-                        {match.idea.authors[0].name.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-700">
-                        {match.idea.authors[0].name}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        相似度: {(match.similarity * 100).toFixed(0)}%
-                      </div>
-                    </div>
-                  </div>
-                  <button className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors">
-                    <FiMessageCircle size={14} />
-                    发起讨论
-                  </button>
-                </div>
-                
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    {match.idea.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 line-clamp-3">
-                    {match.idea.content}
-                  </p>
-                  
-                  {match.idea.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {match.idea.tags.map((tag, tagIndex) => (
-                        <span
-                          key={tagIndex}
-                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-600"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+            {matchIdeas.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>没有找到相似的想法</p>
+                <p className="text-sm mt-1">尝试调整你的想法内容，可能会找到更多匹配</p>
               </div>
-            ))}
+            ) : (
+              matchIdeas.map((match, index) => (
+                <div key={match.idea.id} className="border border-blue-200 rounded-lg p-4 bg-blue-50 transition-all duration-300 hover:shadow-md">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-medium">
+                          {match.idea.authors[0].name.charAt(0)}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">
+                          {match.idea.authors[0].name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          相似度: {(match.similarity * 100).toFixed(0)}%
+                        </div>
+                      </div>
+                    </div>
+                    <button className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors">
+                      <FiMessageCircle size={14} />
+                      发起讨论
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      {match.idea.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 line-clamp-3">
+                      {match.idea.content}
+                    </p>
+                    
+                    {match.idea.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {match.idea.tags.map((tag, tagIndex) => (
+                          <span
+                            key={tagIndex}
+                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-600"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

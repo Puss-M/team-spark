@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import IdeasFeed from '../components/IdeasFeed';
 import IdeaInput from '../components/IdeaInput';
@@ -9,8 +9,20 @@ import MobileBottomNav from '../components/MobileBottomNav';
 import { useAppStore } from '../store/useAppStore';
 
 const Home: React.FC = () => {
-  const { isLoggedIn, login } = useAppStore();
+  const { isLoggedIn, login, setAuthor } = useAppStore();
   const [mobileTab, setMobileTab] = useState<'feed' | 'post' | 'profile'>('feed');
+
+  // Initialize app state from localStorage on client mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedAuthor = localStorage.getItem('author');
+      const storedIsLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      
+      if (storedAuthor && storedIsLoggedIn) {
+        login(storedAuthor);
+      }
+    }
+  }, [login]);
 
   return (
     <>
