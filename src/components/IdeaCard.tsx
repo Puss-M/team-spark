@@ -13,6 +13,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { recallIdea, findMatchesForIdea, toggleLike, user, author, comments, fetchComments, addComment, deleteComment } = useAppStore();
+  // Trigger rebuild to pick up type definition fix
   const [commentContent, setCommentContent] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
