@@ -223,7 +223,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
                     setAiResult(result);
                     
                     // 将AI分析作为评论添加
-                    await addComment(idea.id, result, 'AI Research Assistant');
+                    await addComment(idea.id, result);
                     
                     useAppStore.getState().showToast('AI分析完成！', 'success');
                   } catch (error) {
