@@ -114,6 +114,15 @@ interface AppState {
   fetchUserInterests: (username: string) => Promise<void>;
   saveUserInterests: (username: string, interests: string[]) => Promise<void>;
   setUserInterests: (interests: string[]) => void;
+  
+  // Idea Market functionality
+  userBalance: number;
+  userInvestments: any[];
+  topInvestors: any[];
+  fetchUserWallet: (username: string) => Promise<void>;
+  investInIdea: (ideaId: string, amount: number) => Promise<boolean>;
+  fetchUserInvestments: (username: string) => Promise<void>;
+  fetchTopInvestors: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -246,8 +255,23 @@ export const useAppStore = create<AppState>((set, get) => ({
           return hotnessB - hotnessA;
         });
       } else if (sortBy === 'recommend') {
-        // For recommend sort with fallback, we'll just use the same as latest
+        const { userInterests } = state;
+        
         sortedIdeas = sortedIdeas.sort((a, b) => {
+          // Calculate match scores (number of matching tags)
+          const scoreA = userInterests.length > 0 
+            ? a.tags.filter(tag => userInterests.includes(tag)).length 
+            : 0;
+          const scoreB = userInterests.length > 0 
+            ? b.tags.filter(tag => userInterests.includes(tag)).length 
+            : 0;
+          
+          // Sort by match score first (higher is better)
+          if (scoreA !== scoreB) {
+            return scoreB - scoreA;
+          }
+          
+          // If same score, sort by time (newer first)
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
       } else {
@@ -1052,6 +1076,139 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error: any) {
       console.error('Error saving user interests:', error);
       get().showToast('保存失败: ' + (error.message || '请稍后重试'), 'error');
+    }
+  },
+  
+  // Idea Market functionality
+  userBalance: 100,
+  userInvestments: [],
+  topInvestors: [],
+  
+  fetchUserWallet: async (username: string) => {
+    if (!username) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_wallets')
+        .select('*')
+        .eq('user_name', username)
+        .maybeSingle();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching wallet:', error);
+        return;
+      }
+      
+      if (data) {
+        set({ userBalance: data.balance });
+      } else {
+        // 初始化钱包
+        const { error: insertError } = await supabase
+          .from('user_wallets')
+          .insert({ user_name: username, balance: 100 });
+        
+        if (!insertError) {
+          set({ userBalance: 100 });
+        }
+      }
+    } catch (error) {
+      console.warn('Error fetching wallet:', error);
+    }
+  },
+  
+  investInIdea: async (ideaId: string, amount: number) => {
+    const { username, userBalance } = get();
+    
+    if (!username) {
+      get().showToast('请先登录', 'error');
+      return false;
+    }
+    
+    if (amount > userBalance) {
+      get().showToast(`余额不足！当前余额: ${userBalance} coins`, 'error');
+      return false;
+    }
+    
+    if (amount < 1) {
+      get().showToast('投资金额至少为 1 coin', 'error');
+      return false;
+    }
+    
+    try {
+      // 1. 先获取当前total_invested
+      const { data: walletData } = await supabase
+        .from('user_wallets')
+        .select('total_invested')
+        .eq('user_name', username)
+        .single();
+      
+      const newTotalInvested = (walletData?.total_invested || 0) + amount;
+      
+      // 2. 扣除余额
+      const { error: walletError } = await supabase
+        .from('user_wallets')
+        .update({ 
+          balance: userBalance - amount,
+          total_invested: newTotalInvested
+        })
+        .eq('user_name', username);
+      
+      if (walletError) throw walletError;
+      
+      // 2. 记录投资
+      const { error: investError } = await supabase
+        .from('investments')
+        .insert({
+          user_name: username,
+          idea_id: ideaId,
+          amount
+        });
+      
+      if (investError) throw investError;
+      
+      // 3. 更新本地状态
+      set({ userBalance: userBalance - amount });
+      
+      get().showToast(`成功投资 ${amount} coins! 🚀`, 'success');
+      return true;
+    } catch (error: any) {
+      console.error('Error investing:', error);
+      get().showToast('投资失败: ' + (error.message || '请稍后重试'), 'error');
+      return false;
+    }
+  },
+  
+  fetchUserInvestments: async (username: string) => {
+    if (!username) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('investments')
+        .select('*, ideas(title, content)')
+        .eq('user_name', username)
+        .order('timestamp', { ascending: false });
+      
+      if (error) throw error;
+      
+      set({ userInvestments: data || [] });
+    } catch (error) {
+      console.warn('Error fetching investments:', error);
+    }
+  },
+  
+  fetchTopInvestors: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_wallets')
+        .select('*')
+        .order('total_earned', { ascending: false })
+        .limit(10);
+      
+      if (error) throw error;
+      
+      set({ topInvestors: data || [] });
+    } catch (error) {
+      console.warn('Error fetching top investors:', error);
     }
   },
 }));

@@ -39,6 +39,9 @@ const Home: React.FC = () => {
         // Fetch user interests and check if should show modal
         (async () => {
           await fetchUserInterests(storedUsername);
+          // 初始化钱包
+          await useAppStore.getState().fetchUserWallet(storedUsername);
+          
           // Delay to ensure state is updated
           setTimeout(() => {
             const currentState = useAppStore.getState();

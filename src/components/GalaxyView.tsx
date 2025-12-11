@@ -23,19 +23,66 @@ const GalaxyView: React.FC = () => {
   const graphData = useMemo(() => {
     const publicIdeas = ideas.filter(i => i.is_public);
     
+    // Helper: 计算灵感年龄（天数）
+    const getDaysOld = (createdAt: string) => {
+      const now = new Date();
+      const created = new Date(createdAt);
+      return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+    };
+    
+    // Helper: 根据生命周期返回颜色
+    const getNodeColor = (idea: IdeaWithAuthors) => {
+      const daysOld = getDaysOld(idea.created_at);
+      const hotness = (idea.likes_count || 0) + (idea.comments_count || 0) * 2;
+      
+      // 红巨星：高热度（>10互动）
+      if (hotness > 10) return '#ef4444'; // red-500
+      
+      // 新星：<3天
+      if (daysOld < 3) return '#60a5fa'; // blue-400
+      
+      // 白矮星：>7天且低互动
+      if (daysOld > 7 && hotness < 3) return '#9ca3af'; // gray-400
+      
+      // 恒星：正常状态
+      return '#fbbf24'; // amber-400
+    };
+    
+    // Helper: 计算节点大小
+    const getNodeSize = (idea: IdeaWithAuthors) => {
+      const daysOld = getDaysOld(idea.created_at);
+      const hotness = (idea.likes_count || 0) * 2 + (idea.comments_count || 0) * 3;
+      
+      // 基础大小
+      let size = 8;
+      
+      // 红巨星：1.5倍大
+      if (hotness > 10) size = 15;
+      // 新星：正常大小 + 闪烁
+      else if (daysOld < 3) size = 10;
+      // 白矮星：0.6倍小
+      else if (daysOld > 7 && hotness < 3) size = 5;
+      // 恒星：正常
+      else size = 8 + hotness * 0.5;
+      
+      return size;
+    };
+    
     const nodes = publicIdeas.map(idea => ({
       id: idea.id,
       name: idea.title || idea.content.substring(0, 20) + '...',
-      val: 10 + (idea.likes_count || 0) * 2 + (idea.comments_count || 0) * 3, // Size based on engagement
+      val: getNodeSize(idea),
+      color: getNodeColor(idea),
       group: idea.tags && idea.tags.length > 0 ? idea.tags[0] : 'untagged',
       fullContent: idea.content,
-      author: idea.authors?.[0]?.name || 'Unknown'
+      author: idea.authors?.[0]?.name || 'Unknown',
+      daysOld: getDaysOld(idea.created_at),
+      hotness: (idea.likes_count || 0) + (idea.comments_count || 0) * 2
     }));
 
     const links: { source: string; target: string }[] = [];
     
     // Create links based on shared tags
-    // This is O(N^2) complexity, might be slow for huge datasets, but fine for < 1000 ideas
     for (let i = 0; i < publicIdeas.length; i++) {
       for (let j = i + 1; j < publicIdeas.length; j++) {
         const ideaA = publicIdeas[i];
@@ -72,18 +119,18 @@ const GalaxyView: React.FC = () => {
       <ForceGraph3D
         graphData={graphData}
         nodeLabel="name"
-        nodeAutoColorBy="group"
+        nodeColor={(node: any) => node.color} // 使用自定义颜色
         nodeResolution={16}
-        linkDirectionalParticles={1}
-        linkDirectionalParticleWidth={1}
-        linkDirectionalParticleSpeed={0.005}
+        linkDirectionalParticles={2} // 增加粒子数量
+        linkDirectionalParticleWidth={2}
+        linkDirectionalParticleSpeed={0.008} // 稍快的粒子
         backgroundColor="#f9fafb" // gray-50
-        nodeOpacity={1}
+        nodeOpacity={0.9}
         
         // Link styling
         linkColor={() => '#cbd5e1'} // slate-300
-        linkOpacity={0.3}
-        linkWidth={1}
+        linkOpacity={0.4} // 稍微增加透明度
+        linkWidth={1.5}
         
         // Node styling
         nodeThreeObjectExtend={true} 
@@ -94,7 +141,12 @@ const GalaxyView: React.FC = () => {
           document.body.style.cursor = node ? 'pointer' : 'default';
         }}
         onNodeClick={(node: any) => {
-          alert(`${node.name}\n\n${node.fullContent}\n\nBy: ${node.author}`);
+          // 显示节点详情
+          const statusEmoji = node.hotness > 10 ? '🔴 红巨星' : 
+                            node.daysOld < 3 ? '🌟 新星' :
+                            node.daysOld > 7 && node.hotness < 3 ? '⚪ 白矮星' : '⭐ 恒星';
+          
+          alert(`${statusEmoji}\n\n${node.name}\n\n${node.fullContent}\n\nBy: ${node.author}\n年龄: ${node.daysOld}天 | 热度: ${node.hotness}`);
         }}
       />
       

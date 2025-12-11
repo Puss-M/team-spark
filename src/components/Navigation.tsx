@@ -21,6 +21,7 @@ const Navigation: React.FC = () => {
     setActiveSocialGroupId,
     username,
     logout,
+    userBalance,
   } = useAppStore();
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -184,7 +185,10 @@ const Navigation: React.FC = () => {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-700">User: {username}</p>
-              <p className="text-xs text-gray-400">已登录</p>
+              <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                <span>💰</span>
+                <span>{userBalance} Spark Coins</span>
+              </p>
             </div>
           </div>
           <button

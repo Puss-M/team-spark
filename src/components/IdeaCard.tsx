@@ -5,6 +5,7 @@ import { FaHeart } from 'react-icons/fa'; // Filled heart for liked state
 import { IdeaWithAuthors } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import MarkdownRenderer from './MarkdownRenderer';
+import { runAutoReviewer } from '../services/aiReviewer';
 
 interface IdeaCardProps {
   idea: IdeaWithAuthors;
@@ -12,7 +13,9 @@ interface IdeaCardProps {
 
 const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const { setActiveIdea, recallIdea, findMatchesForIdea, toggleLike, user, username, comments, userInterests } = useAppStore();
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState<string>('');
+  const { setActiveIdea, recallIdea, findMatchesForIdea, toggleLike, user, username, comments, userInterests, addComment } = useAppStore();
   
   // Check if current user is the author
   const isAuthor = idea.authors.some(a => a.name === username);
@@ -62,7 +65,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   return (
     <>
       {/* Wrapper for gradient border effect */}
-      <div className={`relative mb-3 rounded-lg ${
+      <div className={`relative rounded-lg ${
         hasMatchingTag 
           ? 'p-[2px] bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-pulse' 
           : ''
@@ -175,17 +178,72 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
               <FiMessageCircle size={14} />
               <span>{idea.comments_count} 评论</span>
             </button>
+            
+            {/* 投资按钮 */}
+            {!isAuthor && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const amount = prompt('投资多少 Spark Coins？');
+                  if (amount && !isNaN(Number(amount))) {
+                    const success = await useAppStore.getState().investInIdea(idea.id, Number(amount));
+                    if (success) {
+                      // 更新ideas以触发重新渲染
+                      useAppStore.getState().fetchIdeas();
+                    }
+                  }
+                }}
+                className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-full transition-colors"
+              >
+                <span>💰</span>
+                <span>投资</span>
+              </button>
+            )}
           </div>
           
-          {/* Find Inspiration Button (Only for Author) */}
+           {/* Find Inspiration Button (Only for Author) */}
           {isAuthor && (
-            <button
-              onClick={handleFindInspiration}
-              className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors"
-            >
-              <span>✨</span>
-              <span>寻找灵感</span>
-            </button>
+            <>
+              <button
+                onClick={handleFindInspiration}
+                className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors"
+              >
+                <span>✨</span>
+                <span>寻找灵感</span>
+              </button>
+              
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (aiAnalyzing) return;
+                  
+                  setAiAnalyzing(true);
+                  try {
+                    const result = await runAutoReviewer(idea.content);
+                    setAiResult(result);
+                    
+                    // 将AI分析作为评论添加
+                    await addComment(idea.id, result, 'AI Research Assistant');
+                    
+                    useAppStore.getState().showToast('AI分析完成！', 'success');
+                  } catch (error) {
+                    console.error('AI analysis error:', error);
+                    useAppStore.getState().showToast('AI分析失败，请检查API密钥', 'error');
+                  } finally {
+                    setAiAnalyzing(false);
+                  }
+                }}
+                disabled={aiAnalyzing}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+                  aiAnalyzing 
+                    ? 'text-gray-400 bg-gray-100 cursor-not-allowed' 
+                    : 'text-purple-600 bg-purple-50 hover:bg-purple-100'
+                }`}
+              >
+                <span>🤖</span>
+                <span>{aiAnalyzing ? '分析中...' : 'AI分析'}</span>
+              </button>
+            </>
           )}
         </div>
       </div>
