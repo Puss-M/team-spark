@@ -105,6 +105,15 @@ interface AppState {
   };
   showToast: (message: string, type: 'success' | 'error' | 'info') => void;
   hideToast: () => void;
+
+  // User interests functionality
+  userInterests: string[];
+  hasSelectedInterests: boolean;
+  showInterestModal: boolean;
+  setShowInterestModal: (show: boolean) => void;
+  fetchUserInterests: (username: string) => Promise<void>;
+  saveUserInterests: (username: string, interests: string[]) => Promise<void>;
+  setUserInterests: (interests: string[]) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -161,71 +170,38 @@ export const useAppStore = create<AppState>((set, get) => ({
       
       let fetchedIdeas: any[] = [];
       
-      try {
-        console.log('Fetching ideas from Supabase using RPC...');
-        
-        // Map frontend sortBy to backend p_sort_by values
-        const getSortByValue = () => {
-          switch (sortBy) {
-            case 'latest':
-              return 'time';
-            case 'popular':
-              return 'heat';
-            case 'recommend':
-              return 'recommend';
-            default:
-              return 'time';
-          }
-        };
+      console.log('Fetching ideas from Supabase...');
+      
+      // Use traditional Supabase query
+      let query = supabase
+        .from('ideas')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        // Call the RPC function
-        const { data, error } = await supabase
-          .rpc('get_ranked_ideas', {
-            p_user_username: username,
-            p_sort_by: getSortByValue(),
-            p_search_term: searchQuery
-          });
-        
-        if (error) {
-          console.error('Supabase RPC error details:', error);
-          throw error;
-        }
-        
-        console.log('Fetched ideas from RPC:', data);
-        fetchedIdeas = data || [];
-      } catch (rpcError) {
-        console.error('RPC call failed, falling back to traditional fetch...', rpcError);
-        
-        // Fall back to traditional fetching method
-        let query = supabase
-          .from('ideas')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        // Apply visibility filter
-        if (username) {
-          // Show: Public ideas OR Private ideas where author matches current user
-          query = query.or(`is_public.eq.true,author_id.cs.{${username}}`);
-        } else {
-          // Not logged in: Show only public ideas
-          query = query.eq('is_public', true);
-        }
-
-        // Apply search filter if searchQuery is provided
-        if (searchQuery) {
-          query = query.or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`);
-        }
-
-        const { data, error } = await query;
-        
-        if (error) {
-          console.error('Supabase error details:', error);
-          throw error;
-        }
-        
-        console.log('Fetched ideas with fallback method:', data);
-        fetchedIdeas = data || [];
+      // Apply visibility filter
+      if (username) {
+        // Show: Public ideas OR Private ideas where author matches current user
+        query = query.or(`is_public.eq.true,author_id.cs.{${username}}`);
+      } else {
+        // Not logged in: Show only public ideas
+        query = query.eq('is_public', true);
       }
+
+      // Apply search filter if searchQuery is provided
+      if (searchQuery) {
+        query = query.or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw error;
+      }
+      
+      console.log('Fetched ideas:', data?.length || 0, 'ideas');
+      fetchedIdeas = data || [];
+
       
       // For each idea, get likes count and check if current user liked it
       const ideasWithLikes: IdeaWithAuthors[] = await Promise.all(
@@ -983,6 +959,99 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }));
       alert('发送消息失败');
+    }
+  },
+
+  // User interests functionality
+  userInterests: [],
+  hasSelectedInterests: false,
+  showInterestModal: false,
+  
+  setShowInterestModal: (show) => set({ showInterestModal: show }),
+  
+  setUserInterests: (interests) => set({ 
+    userInterests: interests,
+    hasSelectedInterests: interests.length > 0
+  }),
+  
+  fetchUserInterests: async (username: string) => {
+    if (!username) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_interests')
+        .select('interests')
+        .eq('user_name', username)
+        .maybeSingle();
+      
+      // Ignore errors if table doesn't exist yet
+      if (error) {
+        // PGRST116 is "not found", 42P01 is "table does not exist"
+        if (error.code === 'PGRST116' || error.code === '42P01') {
+          console.log('User interests table not found or user has no interests yet');
+          set({ 
+            userInterests: [],
+            hasSelectedInterests: false
+          });
+          return;
+        }
+        console.warn('Error fetching user interests:', error);
+        return;
+      }
+      
+      if (data) {
+        set({ 
+          userInterests: data.interests || [],
+          hasSelectedInterests: true
+        });
+      } else {
+        set({ 
+          userInterests: [],
+          hasSelectedInterests: false
+        });
+      }
+    } catch (error) {
+      console.warn('Error fetching user interests:', error);
+      // Set default values on error
+      set({ 
+        userInterests: [],
+        hasSelectedInterests: false
+      });
+    }
+  },
+  
+  saveUserInterests: async (username: string, interests: string[]) => {
+    if (!username || interests.length === 0) return;
+    
+    try {
+      // Use upsert to insert or update
+      const { error } = await supabase
+        .from('user_interests')
+        .upsert({
+          user_name: username,
+          interests,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_name'
+        });
+      
+      if (error) {
+        console.error('Error saving user interests:', error);
+        throw error;
+      }
+      
+      // Update local state
+      set({ 
+        userInterests: interests,
+        hasSelectedInterests: true,
+        showInterestModal: false
+      });
+      
+      // Show success toast
+      get().showToast('兴趣标签已保存！', 'success');
+    } catch (error: any) {
+      console.error('Error saving user interests:', error);
+      get().showToast('保存失败: ' + (error.message || '请稍后重试'), 'error');
     }
   },
 }));

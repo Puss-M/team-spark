@@ -1,10 +1,11 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Navigation from '../components/Navigation';
 import IdeasFeed from '../components/IdeasFeed';
 import IdeaInput from '../components/IdeaInput';
 import MatchIdeasModal from '../components/MatchIdeasModal';
+import InterestSelectionModal from '../components/InterestSelectionModal';
 import MobileBottomNav from '../components/MobileBottomNav';
 import GroupChatView from '../components/GroupChatView';
 import CommunityBoard from '../components/CommunityBoard';
@@ -12,9 +13,20 @@ import GalaxyView from '../components/GalaxyView';
 import { useAppStore } from '../store/useAppStore';
 
 const Home: React.FC = () => {
-  const { isLoggedIn, login, username, activeView, activeSocialGroupId } = useAppStore();
+  const { 
+    isLoggedIn, 
+    login, 
+    username, 
+    activeView, 
+    activeSocialGroupId,
+    saveUserInterests,
+    fetchUserInterests,
+    hasSelectedInterests
+  } = useAppStore();
   const [mobileTab, setMobileTab] = useState<'feed' | 'community' | 'post' | 'profile' | 'galaxy'>('feed');
+  const [showInterestModal, setShowInterestModal] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Initialize app state from localStorage on client mount
   useEffect(() => {
@@ -24,12 +36,44 @@ const Home: React.FC = () => {
       
       if (storedUsername && storedIsLoggedIn) {
         login(storedUsername);
+        
+        // Fetch user interests and check if should show modal
+        (async () => {
+          await fetchUserInterests(storedUsername);
+          // Delay to ensure state is updated
+          setTimeout(() => {
+            const currentState = useAppStore.getState();
+            console.log('🔍 hasSelectedInterests:', currentState.hasSelectedInterests);
+            console.log('🔍 userInterests:', currentState.userInterests);
+            
+            if (!currentState.hasSelectedInterests) {
+              console.log('✅ Showing interest modal - user has not selected interests');
+              setShowInterestModal(true);
+            } else {
+              console.log('ℹ️ Not showing modal - user already has interests:', currentState.userInterests);
+            }
+          }, 200);
+        })();
       } else {
         // Redirect to login if not authenticated
         router.push('/login');
       }
     }
-  }, [login, router]);
+  }, [login, router, fetchUserInterests]);
+
+  // Handlers for interest selection
+  const handleCompleteInterests = async (interests: string[]) => {
+    await saveUserInterests(username, interests);
+    setShowInterestModal(false);
+    // Remove query param
+    router.replace('/');
+  };
+
+  const handleSkipInterests = () => {
+    setShowInterestModal(false);
+    // Remove query param
+    router.replace('/');
+  };
 
   // Redirect to login if not authenticated
   if (!isLoggedIn) {
@@ -113,6 +157,14 @@ const Home: React.FC = () => {
         {/* Match Ideas Modal */}
         <MatchIdeasModal />
       </div>
+
+      {/* Interest Selection Modal - Rendered at top level */}
+      {showInterestModal && (
+        <InterestSelectionModal 
+          onComplete={handleCompleteInterests}
+          onSkip={handleSkipInterests}
+        />
+      )}
     </>
   );
 };

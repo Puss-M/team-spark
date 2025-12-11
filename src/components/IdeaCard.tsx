@@ -12,10 +12,15 @@ interface IdeaCardProps {
 
 const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const { setActiveIdea, recallIdea, findMatchesForIdea, toggleLike, user, username, comments, fetchComments } = useAppStore();
+  const { setActiveIdea, recallIdea, findMatchesForIdea, toggleLike, user, username, comments, userInterests } = useAppStore();
   
   // Check if current user is the author
   const isAuthor = idea.authors.some(a => a.name === username);
+  
+  // Check if idea matches user's interests
+  const hasMatchingTag = userInterests.length > 0 && idea.tags.some(tag => 
+    userInterests.includes(tag)
+  );
 
   // Format date to relative time
   const formatRelativeTime = (dateString: string) => {
@@ -56,14 +61,22 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
 
   return (
     <>
-      <div 
-        className={`group relative bg-white rounded-lg border p-4 mb-4 shadow-sm hover:shadow-md transition-all cursor-pointer hover:border-blue-300 ${
-          idea.match_score && idea.match_score > 0
-            ? 'border-yellow-300 ring-1 ring-yellow-200 hover:ring-yellow-300'
-            : 'border-gray-200'
-        }`}
-        onClick={() => setActiveIdea(idea)}
-      >
+      {/* Wrapper for gradient border effect */}
+      <div className={`relative mb-3 rounded-lg ${
+        hasMatchingTag 
+          ? 'p-[2px] bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-pulse' 
+          : ''
+      }`}>
+        <div 
+          className={`group relative bg-white rounded-lg border p-3 shadow-sm hover:shadow-md transition-all cursor-pointer hover:border-blue-300 ${
+            idea.match_score && idea.match_score > 0
+              ? 'border-yellow-300 ring-1 ring-yellow-200 hover:ring-yellow-300'
+              : hasMatchingTag
+                ? 'border-transparent'
+                : 'border-gray-200'
+          }`}
+          onClick={() => setActiveIdea(idea)}
+        >
         {/* Recommended Badge */}
         {idea.match_score && idea.match_score > 0 && (
           <div className="absolute top-2 right-2 bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">
@@ -83,15 +96,15 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
         )}
 
         {/* Header */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-              <span className="text-gray-600 font-medium">
+            <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center">
+              <span className="text-gray-600 font-medium text-xs">
                 {idea.authors[0].name.charAt(0)}
               </span>
             </div>
             <div>
-              <div className="flex items-center gap-1 text-sm">
+              <div className="flex items-center gap-1 text-xs">
                 <span className="text-gray-700 font-medium">
                   {idea.authors[0].name}
                 </span>
@@ -111,13 +124,13 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
         </div>
 
         {/* Title */}
-        <h3 className="text-lg font-semibold text-gray-800 mb-2 pr-8">
+        <h3 className="text-base font-semibold text-gray-800 mb-2 pr-8">
           {idea.title}
         </h3>
 
         {/* Content */}
-        <div className="mb-3">
-          <div className="text-gray-600 mb-1 line-clamp-3 prose prose-sm max-w-none">
+        <div className="mb-2">
+          <div className="text-gray-600 mb-1 line-clamp-2 prose prose-sm max-w-none">
             <MarkdownRenderer content={idea.content} />
           </div>
           {idea.content.length > 150 && (
@@ -141,7 +154,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
           <div className="flex items-center gap-4">
             <button 
               onClick={handleLike}
@@ -175,6 +188,7 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
             </button>
           )}
         </div>
+      </div>
       </div>
       
       {/* Delete Confirmation Modal */}
