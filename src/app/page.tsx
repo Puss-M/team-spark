@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Navigation from '../components/Navigation';
 import IdeasFeed from '../components/IdeasFeed';
 import IdeaInput from '../components/IdeaInput';
@@ -26,7 +26,6 @@ const Home: React.FC = () => {
   const [mobileTab, setMobileTab] = useState<'feed' | 'community' | 'post' | 'profile' | 'galaxy'>('feed');
   const [showInterestModal, setShowInterestModal] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // Initialize app state from localStorage on client mount
   useEffect(() => {
