@@ -27,7 +27,7 @@ try {
 // We need to use dynamic import because static imports are hoisted, 
 // causing the service (and OpenAI client) to initialize before we set process.env
 const runTest = async () => {
-  const { analyzeIdeaWithAI, ArxivPaper } = await import('../src/services/aiReviewer');
+  const { analyzeIdeaWithAI } = await import('../src/services/aiReviewer');
 
   async function testAIReviewer() {
     console.log('🧪 Starting Unit Test for AI Reviewer...');

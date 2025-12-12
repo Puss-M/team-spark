@@ -9,7 +9,7 @@ import InterestSelectionModal from '../components/InterestSelectionModal';
 import MobileBottomNav from '../components/MobileBottomNav';
 import GroupChatView from '../components/GroupChatView';
 import CommunityBoard from '../components/CommunityBoard';
-import GalaxyView from '../components/GalaxyView';
+import Galaxy3D from '../components/Galaxy3D';
 import { useAppStore } from '../store/useAppStore';
 
 const Home: React.FC = () => {
@@ -100,7 +100,7 @@ const Home: React.FC = () => {
           
           {activeSocialGroupId ? <GroupChatView /> : 
            activeView === 'community' ? <CommunityBoard /> : 
-           activeView === 'galaxy' ? <GalaxyView /> : 
+           activeView === 'galaxy' ? <Galaxy3D /> : 
            <IdeasFeed />}
         </div>
         
@@ -140,7 +140,7 @@ const Home: React.FC = () => {
           
           {mobileTab === 'feed' && <IdeasFeed />}
           {mobileTab === 'community' && <CommunityBoard />}
-          {mobileTab === 'galaxy' && <GalaxyView />}
+          {mobileTab === 'galaxy' && <Galaxy3D />}
           {mobileTab === 'post' && (
             <div className="p-4">
               <IdeaInput />

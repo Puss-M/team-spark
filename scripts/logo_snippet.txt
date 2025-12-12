@@ -1,0 +1,17 @@
+// 在 Navigation.tsx 的 return 语句后添加以下代码
+// 找到第 78-80 行，在 <div className="flex flex-col h-full..."> 之后添加：
+
+{/* Logo - 添加这部分 */}
+<div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-200">
+  <img 
+    src="/logo.jpg" 
+    alt="spark.lab logo" 
+    className="w-12 h-12 object-contain rounded"
+  />
+  <div>
+    <h1 className="text-xl font-bold text-blue-600">
+      spark<span className="text-red-600">.lab</span>
+    </h1>
+    <p className="text-xs text-gray-500">igniting ideas</p>
+  </div>
+</div>

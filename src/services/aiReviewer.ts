@@ -23,8 +23,10 @@ export interface ArxivPaper {
 export async function searchArxiv(query: string): Promise<ArxivPaper[]> {
   try {
     const searchQuery = encodeURIComponent(query);
-    const url = `http://export.arxiv.org/api/query?search_query=all:${searchQuery}&max_results=3&sortBy=relevance&sortOrder=descending`;
+    // 使用 HTTPS 避免混合内容错误
+    const url = `https://export.arxiv.org/api/query?search_query=all:${searchQuery}&max_results=3&sortBy=relevance&sortOrder=descending`;
     
+    console.log('🔍 Searching arXiv...');
     const response = await fetch(url);
     const xmlText = await response.text();
     
@@ -60,9 +62,11 @@ export async function searchArxiv(query: string): Promise<ArxivPaper[]> {
       });
     }
     
+    console.log(`✅ Found ${papers.length} arXiv papers`);
     return papers;
   } catch (error) {
-    console.error('Error searching arXiv:', error);
+    console.warn('⚠️ arXiv unavailable, continuing without papers:', error);
+    // 返回空数组，让 AI 继续分析（不依赖论文）
     return [];
   }
 }
