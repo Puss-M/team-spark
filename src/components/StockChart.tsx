@@ -4,7 +4,7 @@ import React from 'react';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip } from 'recharts';
 
 interface StockChartProps {
-  data?: { value: number; time: string }[];
+  data?: { value: number; time: number }[];
   color?: string;
 }
 
