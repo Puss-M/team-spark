@@ -26,6 +26,10 @@ const IdeaInput: React.FC = () => {
   const [isMatching, setIsMatching] = useState(false);
   const [isExtractingTags, setIsExtractingTags] = useState(false);
   
+  // Bounty state
+  const [isBounty, setIsBounty] = useState(false);
+  const [bountyAmount, setBountyAmount] = useState(50);
+
   // Group creation dialog state
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<'write' | 'preview' | 'split'>('write');
@@ -91,6 +95,10 @@ const IdeaInput: React.FC = () => {
         comments_count: 0,
         likes_count: 0,
         embedding,
+        // Optimistic Bounty
+        is_bounty: isBounty,
+        bounty_amount: isBounty ? bountyAmount : 0,
+        status: 'idea'
       };
       
       // 🚀 OPTIMISTIC UPDATE: Add to UI immediately
@@ -102,6 +110,8 @@ const IdeaInput: React.FC = () => {
       
       // Reset form immediately for better UX
       resetNewIdea();
+      setIsBounty(false); // Reset bounty state
+      setBountyAmount(50);
       
       // Step 2: Match similar ideas using database RPC
       console.log('🔍 步骤 2/3: 碰撞匹配相似灵感...');
@@ -153,46 +163,59 @@ const IdeaInput: React.FC = () => {
             content: newIdea.content,
             is_public: newIdea.isPublic,
             tags: newIdea.tags,
-            embedding
+            embedding,
+            is_bounty: false, // Default false, enable via RPC
+            bounty_amount: 0
           })
           .select()
           .single();
 
         if (error) {
           console.error('❌ 数据库插入失败:', error);
-          
-          // 🔄 ROLLBACK: Remove optimistic update on error
-          console.log('⚠️ 回滚：移除乐观更新的灵感');
-          const { ideas } = useAppStore.getState();
-          useAppStore.setState({
-            ideas: ideas.filter(i => i.id !== tempId)
-          });
-          
-          // 提供更具体的错误信息
-          let errorMessage = '数据库保存失败';
-          
-          if (error.message.includes('permission') || error.message.includes('policy')) {
-            errorMessage = '❌ 步骤 3/3 失败：数据库权限不足\n\n请在 Supabase 中运行 supabase/setup_permissions.sql 脚本来设置权限';
-          } else if (error.message.includes('network') || error.message.includes('fetch')) {
-            errorMessage = '❌ 步骤 3/3 失败：网络连接错误\n\n请检查网络连接并重试';
-          } else {
-            errorMessage = `❌ 步骤 3/3 失败：${error.message}\n\n错误代码: ${error.code || '未知'}`;
-          }
-          
-          alert(errorMessage);
-          return;
+          throw error;
         }
         
         console.log('✅ 保存成功！ID:', insertedData?.id);
         
+        // Handle Bounty Logic
+        if (isBounty && insertedData) {
+          try {
+             // @ts-ignore
+             const { data: bountyData, error: bountyError } = await supabase
+               .rpc('post_bounty', {
+                 p_idea_id: insertedData.id,
+                 p_amount: bountyAmount,
+                 p_user_name: username
+               });
+             
+             if (bountyError) throw bountyError;
+             if (bountyData && !bountyData.success) {
+               alert(`悬赏发布失败: ${bountyData.message}`);
+             } else {
+               console.log('💰 悬赏发布成功');
+               useAppStore.getState().showToast(`成功发布悬赏 ${bountyAmount} regular coins!`, 'success');
+               // Refresh wallet
+               useAppStore.getState().fetchUserWallet(username);
+             }
+          } catch (e: any) {
+             console.error('Bounty Error', e);
+             alert(`悬赏设置失败(灵感已发布): ${e.message}`);
+          }
+        }
+        
         // ✨ UPDATE: Replace temp ID with real ID from database
         if (insertedData) {
           console.log('🔄 更新：用真实 ID 替换临时 ID');
+           const finalIdea = {
+             ...insertedData,
+             is_bounty: isBounty, 
+             bounty_amount: isBounty ? bountyAmount : 0
+          };
           const { ideas } = useAppStore.getState();
           useAppStore.setState({
             ideas: ideas.map(i => 
               i.id === tempId 
-                ? { ...i, id: insertedData.id }
+                ? { ...i, ...finalIdea, id: insertedData.id }
                 : i
             )
           });
@@ -209,7 +232,7 @@ const IdeaInput: React.FC = () => {
           ideas: ideas.filter(i => i.id !== tempId)
         });
         
-        alert(`❌ 步骤 3/3 失败：发生未预期的错误\n\n${error.message || '请稍后重试'}`);
+        alert(`❌ 步骤 3/3 失败：${error.message || '请稍后重试'}`);
         return;
       }
     } catch (error: any) {
@@ -469,7 +492,6 @@ const IdeaInput: React.FC = () => {
           </button>
         </div>
         
-        {/* Permission Selection */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -505,6 +527,35 @@ const IdeaInput: React.FC = () => {
                 className="hidden"
               />
             </label>
+
+            <div className="w-px h-4 bg-gray-300 mx-2"></div>
+
+            {/* Bounty Toggle */}
+            <div className="flex items-center gap-2">
+               <label className="flex items-center gap-2 cursor-pointer select-none">
+                 <input 
+                   type="checkbox"
+                   checked={isBounty}
+                   onChange={(e) => setIsBounty(e.target.checked)}
+                   className="rounded text-orange-500 focus:ring-orange-500"
+                 />
+                 <span className={`text-sm font-bold flex items-center gap-1 ${isBounty ? 'text-orange-600' : 'text-gray-500'}`}>
+                    💰 悬赏求助
+                 </span>
+               </label>
+               
+               {isBounty && (
+                 <div className="flex items-center gap-1 animate-fadeIn">
+                   <input 
+                     type="number"
+                     value={bountyAmount}
+                     onChange={(e) => setBountyAmount(Math.max(10, parseInt(e.target.value) || 0))}
+                     className="w-16 px-2 py-1 text-sm border border-orange-300 rounded focus:border-orange-500 focus:outline-none text-right"
+                   />
+                   <span className="text-xs text-orange-500 font-medium">coins</span>
+                 </div>
+               )}
+            </div>
           </div>
         </div>
         

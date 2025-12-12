@@ -1,11 +1,13 @@
 'use client';
 import React, { useState } from 'react';
-import { FiMessageCircle, FiTag, FiClock, FiUser, FiTrash2, FiHeart, FiSend } from 'react-icons/fi';
-import { FaHeart } from 'react-icons/fa'; // Filled heart for liked state
+import { FiMessageCircle, FiTag, FiClock, FiUser, FiTrash2, FiHeart, FiSend, FiTrendingUp } from 'react-icons/fi';
+import { FaHeart, FaCoins } from 'react-icons/fa'; // Filled heart for liked state
 import { IdeaWithAuthors } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import MarkdownRenderer from './MarkdownRenderer';
 import { runAutoReviewer } from '../services/aiReviewer';
+import { StockChart } from './StockChart';
+import { BettingModal } from './BettingModal';
 
 interface IdeaCardProps {
   idea: IdeaWithAuthors;
@@ -13,6 +15,7 @@ interface IdeaCardProps {
 
 const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showBettingModal, setShowBettingModal] = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<string>('');
   const { setActiveIdea, recallIdea, findMatchesForIdea, toggleLike, user, username, comments, userInterests, addComment } = useAppStore();
@@ -82,11 +85,20 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
         >
         {/* Recommended Badge */}
         {idea.match_score && idea.match_score > 0 && (
-          <div className="absolute top-2 right-2 bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">
+          <div className="absolute top-2 right-2 bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1 z-10">
             <span className="inline-block">✨</span>
             <span>推荐</span>
           </div>
         )}
+        
+        {/* Bounty Badge */}
+        {idea.is_bounty && (
+          <div className="absolute top-2 right-20 bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 z-10 animate-pulse border border-orange-200">
+            <span className="inline-block">💰</span>
+            <span>悬赏: {idea.bounty_amount}</span>
+          </div>
+        )}
+
         {/* Recall Button (Visible on Hover for Author) */}
         {isAuthor && (
           <button
@@ -126,10 +138,23 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
           </div>
         </div>
 
-        {/* Title */}
-        <h3 className="text-base font-semibold text-gray-800 mb-2 pr-8">
-          {idea.title}
-        </h3>
+        {/* Title & Stock Chart Row */}
+        <div className="flex justify-between items-start">
+           <h3 className="text-base font-semibold text-gray-800 mb-2 pr-2 flex-grow">
+            {idea.title}
+          </h3>
+          {/* Miniature Stock Chart */}
+          <div className="w-20 h-10 -mt-1 opacity-80" onClick={e => e.stopPropagation()}>
+             <StockChart color={idea.status === 'project' ? '#10B981' : '#F59E0B'} />
+          </div>
+        </div>
+
+        {/* Status Label (if Project) */}
+        {idea.status === 'project' && (
+           <span className="inline-block px-2 py-0.5 mb-2 text-xs font-bold bg-green-100 text-green-700 rounded border border-green-200">
+             🚀 已立项 (Project)
+           </span>
+        )}
 
         {/* Content */}
         <div className="mb-2">
@@ -182,20 +207,13 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
             {/* 投资按钮 */}
             {!isAuthor && (
               <button
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.stopPropagation();
-                  const amount = prompt('投资多少 Spark Coins？');
-                  if (amount && !isNaN(Number(amount))) {
-                    const success = await useAppStore.getState().investInIdea(idea.id, Number(amount));
-                    if (success) {
-                      // 更新ideas以触发重新渲染
-                      useAppStore.getState().fetchIdeas();
-                    }
-                  }
+                  setShowBettingModal(true);
                 }}
-                className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-full transition-colors"
+                className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-full transition-colors border border-amber-200"
               >
-                <span>💰</span>
+                <FaCoins size={12} />
                 <span>投资</span>
               </button>
             )}
@@ -276,7 +294,14 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
         </div>
       )}
       
-
+      {/* Betting Modal */}
+      {showBettingModal && (
+        <BettingModal 
+          ideaId={idea.id} 
+          ideaTitle={idea.title}
+          onClose={() => setShowBettingModal(false)} 
+        />
+      )}
     </>
   );
 };

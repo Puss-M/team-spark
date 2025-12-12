@@ -1,0 +1,73 @@
+// OPTIMIZED fetchIdeas function for useAppStore.ts
+// Replace lines 174-290 with this
+
+fetchIdeas: async () => {
+  set({ isLoading: true });
+  try {
+    const state = get();
+    const { username, sortBy, searchQuery } = state;
+    
+    console.log('⚡ Fetching ideas with optimized query...');
+    const startTime = Date.now();
+    
+    // 🚀 Use optimized RPC function (single query instead of N+2)
+    const { data: fetchedIdeas, error } = await supabase.rpc('fetch_ideas_optimized', {
+      p_user_name: username || null,
+      p_search_query: searchQuery || null,
+      p_is_public_only: !username
+    });
+    
+    if (error) {
+      console.error('Supabase RPC error:', error);
+      throw error;
+    }
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Fetched ${fetchedIdeas?.length || 0} ideas in ${duration}ms`);
+    
+    // Transform to IdeaWithAuthors format
+    const ideasWithAuthors: IdeaWithAuthors[] = (fetchedIdeas || []).map((idea: any) => ({
+      ...idea,
+      authors: [{ 
+        id: idea.author_id[0], 
+        name: idea.author_id[0], 
+        email: '', 
+        role: '', 
+        created_at: '' 
+      }]
+    }));
+    
+    // Apply client-side sorting
+    let sortedIdeas = ideasWithAuthors;
+    if (sortBy === 'popular') {
+      sortedIdeas = sortedIdeas.sort((a, b) => {
+        const hotnessA = a.likes_count + a.comments_count;
+        const hotnessB = b.likes_count + b.comments_count;
+        return hotnessB - hotnessA;
+      });
+    } else if (sortBy === 'recommend') {
+      const { userInterests } = state;
+      
+      sortedIdeas = sortedIdeas.sort((a, b) => {
+        const scoreA = userInterests.length > 0 
+          ? a.tags.filter(tag => userInterests.includes(tag)).length 
+          : 0;
+        const scoreB = userInterests.length > 0 
+          ? b.tags.filter(tag => userInterests.includes(tag)).length 
+          : 0;
+        
+        if (scoreA !== scoreB) {
+          return scoreB - scoreA;
+        }
+        
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    }
+    
+    set({ ideas: sortedIdeas });
+  } catch (error) {
+    console.error('Error fetching ideas:', error);
+  } finally {
+    set({ isLoading: false });
+  }
+},

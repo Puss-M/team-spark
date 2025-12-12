@@ -171,123 +171,80 @@ export const useAppStore = create<AppState>((set, get) => ({
       idea.id === updatedIdea.id ? updatedIdea : idea
     )
   })),
-  fetchIdeas: async () => {
-    set({ isLoading: true });
-    try {
-      const state = get();
-      const { username, sortBy, searchQuery } = state;
-      
-      let fetchedIdeas: any[] = [];
-      
-      console.log('Fetching ideas from Supabase...');
-      
-      // Use traditional Supabase query
-      let query = supabase
-        .from('ideas')
-        .select('*')
-        .order('created_at', { ascending: false });
+  // OPTIMIZED fetchIdeas function for useAppStore.ts
+// Replace lines 174-290 with this
 
-      // Apply visibility filter
-      if (username) {
-        // Show: Public ideas OR Private ideas where author matches current user
-        query = query.or(`is_public.eq.true,author_id.cs.{${username}}`);
-      } else {
-        // Not logged in: Show only public ideas
-        query = query.eq('is_public', true);
-      }
-
-      // Apply search filter if searchQuery is provided
-      if (searchQuery) {
-        query = query.or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`);
-      }
-
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Supabase error details:', error);
-        throw error;
-      }
-      
-      console.log('Fetched ideas:', data?.length || 0, 'ideas');
-      fetchedIdeas = data || [];
-
-      
-      // For each idea, get likes count and check if current user liked it
-      const ideasWithLikes: IdeaWithAuthors[] = await Promise.all(
-        fetchedIdeas.map(async (idea) => {
-          // Get likes count
-          const { data: likesData, error: likesError } = await supabase
-            .from('idea_likes')
-            .select('*', { count: 'exact', head: false })
-            .eq('idea_id', idea.id);
-          
-          const likesCount = likesData?.length || 0;
-          
-          // Check if current user liked this idea
-          let likedByUser = false;
-          if (username) {
-            const { data: userLike } = await supabase
-              .from('idea_likes')
-              .select('*')
-              .eq('idea_id', idea.id)
-              .eq('user_name', username)
-              .maybeSingle();
-            
-            likedByUser = !!userLike;
-          }
-          
-          return {
-            ...idea,
-            likes_count: likesCount,
-            liked_by_user: likedByUser,
-            authors: [{ id: idea.author_id[0], name: idea.author_id[0], email: '', role: '', created_at: '' }]
-            // Keep the embedding and match_score from the RPC if available
-          };
-        })
-      );
-      
-      // Apply sorting if we used the fallback method
-      let sortedIdeas = ideasWithLikes;
-      if (sortBy === 'popular') {
-        sortedIdeas = sortedIdeas.sort((a, b) => {
-          const hotnessA = a.likes_count + a.comments_count;
-          const hotnessB = b.likes_count + b.comments_count;
-          return hotnessB - hotnessA;
-        });
-      } else if (sortBy === 'recommend') {
-        const { userInterests } = state;
-        
-        sortedIdeas = sortedIdeas.sort((a, b) => {
-          // Calculate match scores (number of matching tags)
-          const scoreA = userInterests.length > 0 
-            ? a.tags.filter(tag => userInterests.includes(tag)).length 
-            : 0;
-          const scoreB = userInterests.length > 0 
-            ? b.tags.filter(tag => userInterests.includes(tag)).length 
-            : 0;
-          
-          // Sort by match score first (higher is better)
-          if (scoreA !== scoreB) {
-            return scoreB - scoreA;
-          }
-          
-          // If same score, sort by time (newer first)
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-      } else {
-        // Default to latest
-        sortedIdeas = sortedIdeas.sort((a, b) => {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-      }
-      
-      set({ ideas: sortedIdeas });
-    } catch (error) {
-      console.error('Error fetching ideas:', error);
-    } finally {
-      set({ isLoading: false });
+fetchIdeas: async () => {
+  set({ isLoading: true });
+  try {
+    const state = get();
+    const { username, sortBy, searchQuery } = state;
+    
+    console.log('⚡ Fetching ideas with optimized query...');
+    const startTime = Date.now();
+    
+    // 🚀 Use optimized RPC function (single query instead of N+2)
+    const { data: fetchedIdeas, error } = await supabase.rpc('fetch_ideas_optimized', {
+      p_user_name: username || null,
+      p_search_query: searchQuery || null,
+      p_is_public_only: !username
+    });
+    
+    if (error) {
+      console.error('Supabase RPC error:', error);
+      throw error;
     }
-  },
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Fetched ${fetchedIdeas?.length || 0} ideas in ${duration}ms`);
+    
+    // Transform to IdeaWithAuthors format
+    const ideasWithAuthors: IdeaWithAuthors[] = (fetchedIdeas || []).map((idea: any) => ({
+      ...idea,
+      authors: [{ 
+        id: idea.author_id[0], 
+        name: idea.author_id[0], 
+        email: '', 
+        role: '', 
+        created_at: '' 
+      }]
+    }));
+    
+    // Apply client-side sorting
+    let sortedIdeas = ideasWithAuthors;
+    if (sortBy === 'popular') {
+      sortedIdeas = sortedIdeas.sort((a, b) => {
+        const hotnessA = a.likes_count + a.comments_count;
+        const hotnessB = b.likes_count + b.comments_count;
+        return hotnessB - hotnessA;
+      });
+    } else if (sortBy === 'recommend') {
+      const { userInterests } = state;
+      
+      sortedIdeas = sortedIdeas.sort((a, b) => {
+        const scoreA = userInterests.length > 0 
+          ? a.tags.filter(tag => userInterests.includes(tag)).length 
+          : 0;
+        const scoreB = userInterests.length > 0 
+          ? b.tags.filter(tag => userInterests.includes(tag)).length 
+          : 0;
+        
+        if (scoreA !== scoreB) {
+          return scoreB - scoreA;
+        }
+        
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    }
+    
+    set({ ideas: sortedIdeas });
+  } catch (error) {
+    console.error('Error fetching ideas:', error);
+  } finally {
+    set({ isLoading: false });
+  }
+},
+
   createIdea: async (title: string, content: string, author: string) => {
     try {
       // Optimistic update
@@ -304,7 +261,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         likes_count: 0,
         authors: [{ id: author, name: author, email: '', role: '', created_at: '' }],
         // Set embedding to undefined initially, will be updated after fetch
-        embedding: undefined
+        embedding: undefined,
+        status: 'idea',
+        is_bounty: false,
+        bounty_amount: 0
       };
       
       get().addIdea(newIdea);
