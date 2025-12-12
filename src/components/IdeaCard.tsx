@@ -1,13 +1,16 @@
 'use client';
 import React, { useState } from 'react';
 import { FiMessageCircle, FiTag, FiClock, FiUser, FiTrash2, FiHeart, FiSend, FiTrendingUp } from 'react-icons/fi';
-import { FaHeart, FaCoins } from 'react-icons/fa'; // Filled heart for liked state
+import { FaHeart, FaCoins } from 'react-icons/fa';
 import { IdeaWithAuthors } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import MarkdownRenderer from './MarkdownRenderer';
 import { runAutoReviewer } from '../services/aiReviewer';
 import { StockChart } from './StockChart';
 import { BettingModal } from './BettingModal';
+import InvestmentPanel from './InvestmentPanel';
+import BountyPanel from './BountyPanel';
+import ArchiveFailureModal from './ArchiveFailureModal';
 
 interface IdeaCardProps {
   idea: IdeaWithAuthors;
@@ -16,9 +19,11 @@ interface IdeaCardProps {
 const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showBettingModal, setShowBettingModal] = useState(false);
+  const [showEconomyPanel, setShowEconomyPanel] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<string>('');
-  const { setActiveIdea, recallIdea, findMatchesForIdea, toggleLike, user, username, comments, userInterests, addComment } = useAppStore();
+  const { setActiveIdea, recallIdea, findMatchesForIdea, toggleLike, user, username, comments, userInterests, addComment, fetchIdeas } = useAppStore();
   
   // Check if current user is the author
   const isAuthor = idea.authors.some(a => a.name === username);
@@ -204,24 +209,39 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
               <span>{idea.comments_count} 评论</span>
             </button>
             
-            {/* 投资按钮 */}
-            {!isAuthor && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowBettingModal(true);
-                }}
-                className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-full transition-colors border border-amber-200"
-              >
-                <FaCoins size={12} />
-                <span>投资</span>
-              </button>
-            )}
+            {/* 经济功能按钮 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEconomyPanel(!showEconomyPanel);
+              }}
+              className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-full transition-colors border ${
+                showEconomyPanel
+                  ? 'text-amber-700 bg-amber-100 border-amber-300'
+                  : 'text-amber-600 bg-amber-50 hover:bg-amber-100 border-amber-200'
+              }`}
+            >
+              <FaCoins size={12} />
+              <span>{showEconomyPanel ? '收起' : '经济'}</span>
+            </button>
           </div>
           
-           {/* Find Inspiration Button (Only for Author) */}
+           {/* Right actions (Delete, Recall, AI) - Only for Author */}
           {isAuthor && (
-            <>
+            <div className="flex gap-2">
+              {/* Archive as Failed Button */}
+              {!idea.is_failed && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowArchiveModal(true);
+                  }}
+                  className="text-gray-600 hover:text-red-600 transition-colors px-2 py-1 hover:bg-red-50 rounded"
+                  title="归档为失败（双倍奖励）"
+                >
+                  <span className="text-sm">🪦</span>
+                </button>
+              )}
               <button
                 onClick={handleFindInspiration}
                 className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors"
@@ -261,9 +281,17 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
                 <span>🤖</span>
                 <span>{aiAnalyzing ? '分析中...' : 'AI分析'}</span>
               </button>
-            </>
+            </div>
           )}
         </div>
+        
+        {/* Economy Panels - Investment & Bounty */}
+        {showEconomyPanel && (
+          <div className="mt-3 space-y-2">
+            <InvestmentPanel ideaId={idea.id} ideaAuthor={idea.author_id[0]} />
+            <BountyPanel idea={idea} onBountyPosted={fetchIdeas} />
+          </div>
+        )}
       </div>
       </div>
       
@@ -300,6 +328,16 @@ const IdeaCard: React.FC<IdeaCardProps> = ({ idea }) => {
           ideaId={idea.id} 
           ideaTitle={idea.title}
           onClose={() => setShowBettingModal(false)} 
+        />
+      )}
+
+      {/* Archive Failure Modal */}
+      {showArchiveModal && (
+        <ArchiveFailureModal
+          ideaId={idea.id}
+          ideaTitle={idea.title}
+          onClose={() => setShowArchiveModal(false)}
+          onSuccess={fetchIdeas}
         />
       )}
     </>

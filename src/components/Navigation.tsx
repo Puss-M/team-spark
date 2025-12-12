@@ -4,6 +4,7 @@ import { FiSearch, FiFilter, FiChevronDown, FiTrendingUp, FiUsers, FiPlus, FiLog
 import { useAppStore } from '../store/useAppStore';
 import CreateGroupModal from './CreateGroupModal';
 import JoinGroupModal from './JoinGroupModal';
+import WalletWidget from './WalletWidget';
 
 const Navigation: React.FC = () => {
   const {
@@ -59,6 +60,38 @@ const Navigation: React.FC = () => {
       action: () => {
         setActiveView('galaxy');
         setActiveSocialGroupId(null);
+      }
+    },
+    { 
+      id: 'seminar', 
+      name: '📊 组会模式', 
+      icon: <FiTrendingUp className="mr-2" />, 
+      action: () => {
+        window.location.href = '/seminar';
+      }
+    },
+    { 
+      id: 'leaderboard', 
+      name: '🏆 排行榜', 
+      icon: <FiTrendingUp className="mr-2" />, 
+      action: () => {
+        window.location.href = '/leaderboard';
+      }
+    },
+    { 
+      id: 'graveyard', 
+      name: '🪦 失败博物馆', 
+      icon: <FiTrendingUp className="mr-2" />, 
+      action: () => {
+        window.location.href = '/graveyard';
+      }
+    },
+    { 
+      id: 'journal', 
+      name: '📖 论文排期', 
+      icon: <FiTrendingUp className="mr-2" />, 
+      action: () => {
+        window.location.href = '/journal';
       }
     },
     { 
@@ -196,12 +229,8 @@ const Navigation: React.FC = () => {
                 {username.charAt(0).toUpperCase()}
               </span>
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-medium text-gray-700">User: {username}</p>
-              <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
-                <span>💰</span>
-                <span>{userBalance} Spark Coins</span>
-              </p>
             </div>
           </div>
           <button
@@ -211,6 +240,11 @@ const Navigation: React.FC = () => {
           >
             <FiLogOut size={16} />
           </button>
+        </div>
+        
+        {/* Wallet Widget */}
+        <div className="mt-2">
+          <WalletWidget userName={username} />
         </div>
       </div>
       

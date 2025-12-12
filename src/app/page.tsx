@@ -10,6 +10,8 @@ import MobileBottomNav from '../components/MobileBottomNav';
 import GroupChatView from '../components/GroupChatView';
 import CommunityBoard from '../components/CommunityBoard';
 import Galaxy3D from '../components/Galaxy3D';
+import ArchaeologyMission from '../components/ArchaeologyMission';
+import OnThisDay from '../components/OnThisDay';
 import { useAppStore } from '../store/useAppStore';
 
 const Home: React.FC = () => {
@@ -93,9 +95,17 @@ const Home: React.FC = () => {
         
         {/* Idea Feed or Group Chat */}
         <div className="flex-1 h-full overflow-y-auto relative">
-          {/* Welcome Section */}
+          {/* Welcome Section with Archaeology */}
           <div className="p-6 bg-white border-b border-gray-200">
-            <h1 className="text-2xl font-bold text-gray-800">Hello, {username}. Ready to capture ideas?</h1>
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold text-gray-800">Hello, {username}. Ready to capture ideas?</h1>
+              <ArchaeologyMission />
+            </div>
+          </div>
+
+          {/* On This Day Banner */}
+          <div className="px-6 pt-6">
+            <OnThisDay />
           </div>
           
           {activeSocialGroupId ? <GroupChatView /> : 
@@ -117,9 +127,9 @@ const Home: React.FC = () => {
 
       {/* Mobile Layout (below md) */}
       <div className="md:hidden flex flex-col h-screen bg-gray-50">
-        {/* Mobile Header */}
+        {/* Mobile Header with Archaeology */}
         <div className="bg-white border-b border-gray-200 p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center">
                 <span className="text-white font-bold">T</span>
@@ -127,6 +137,9 @@ const Home: React.FC = () => {
               <h1 className="text-xl font-bold text-gray-800">Team Spark</h1>
             </div>
             <div className="text-sm text-gray-600">User: {username}</div>
+          </div>
+          <div className="flex justify-center">
+            <ArchaeologyMission />
           </div>
         </div>
 
@@ -136,6 +149,11 @@ const Home: React.FC = () => {
           <div className="p-4 bg-white border-b border-gray-200">
             <h1 className="text-xl font-bold text-gray-800">Hello, {username}!</h1>
             <p className="text-gray-600 mt-1">Ready to capture ideas?</p>
+          </div>
+
+          {/* On This Day Banner */}
+          <div className="px-4 pt-4">
+            <OnThisDay />
           </div>
           
           {mobileTab === 'feed' && <IdeasFeed />}

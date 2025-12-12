@@ -13,25 +13,15 @@ const CommunityBoard: React.FC = () => {
   const [autoTagProgress, setAutoTagProgress] = React.useState({ current: 0, total: 0 });
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
 
-  // Debounce search function
-  const debouncedSearch = useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout;
-      return (query: string) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          setSearchQuery(query);
-        }, 500);
-      };
-    })(),
-    [setSearchQuery]
-  );
-
-  // Handle input change
+  // Handle input change (no longer triggers search automatically)
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setLocalSearchQuery(query);
-    debouncedSearch(query);
+  };
+
+  // Handle search button click
+  const handleSearchClick = () => {
+    setSearchQuery(localSearchQuery);
   };
 
   // Handle enter key press
@@ -177,19 +167,28 @@ const CommunityBoard: React.FC = () => {
       {/* Search and Sort Control Bar */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Search Input */}
-          <div className="relative w-full md:w-64">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <FiSearch className="text-gray-400" size={18} />
+          {/* Search Input with Button */}
+          <div className="relative w-full md:w-80 flex gap-2">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FiSearch className="text-gray-400" size={18} />
+              </div>
+              <input
+                type="text"
+                placeholder="Search ideas..."
+                value={localSearchQuery}
+                onChange={handleSearchInputChange}
+                onKeyPress={handleSearchInputKeyPress}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Search ideas..."
-              value={localSearchQuery}
-              onChange={handleSearchInputChange}
-              onKeyPress={handleSearchInputKeyPress}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-            />
+            <button
+              onClick={handleSearchClick}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
+            >
+              <FiSearch size={16} />
+              <span className="hidden sm:inline">搜索</span>
+            </button>
           </div>
 
           {/* Sorting Tabs */}
