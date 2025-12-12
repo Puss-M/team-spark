@@ -35,6 +35,10 @@ export interface Idea {
   bounty_amount: number;
   bounty_winner_id?: string;
   stock_price?: number; // Visual only, derived from total investments
+  // Failure Graveyard
+  is_failed?: boolean;
+  failure_reason?: string;
+  failed_at?: string;
 }
 
 export interface UserWallet {
