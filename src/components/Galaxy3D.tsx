@@ -96,9 +96,9 @@ const Galaxy3D: React.FC = () => {
   }, [setActiveIdea, setActiveView]);
 
   // 节点悬停事件
-  const handleNodeHover = useCallback((node: GraphNode | null) => {
-    setHoveredNode(node);
-  }, []);
+  const handleNodeHover = (node: any) => {
+    setHoveredNode(node as GraphNode | null);
+  };
 
   // 自定义节点渲染
   const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
