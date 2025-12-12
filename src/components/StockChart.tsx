@@ -27,6 +27,7 @@ export function StockChart({ data = generateMockData(), color = '#10B981' }: Sto
   return (
     <div className="h-12 w-24">
       <ResponsiveContainer width="100%" height="100%">
+        {/* @ts-ignore - recharts type compatibility issue with React 18 */}
         <LineChart data={data}>
           <YAxis domain={['dataMin', 'dataMax']} hide />
           <Line
