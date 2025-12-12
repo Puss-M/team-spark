@@ -1,5 +1,5 @@
 'use client';
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useAppStore } from '../store/useAppStore';
 import * as THREE from 'three';
@@ -32,25 +32,27 @@ const Galaxy3D: React.FC = () => {
   const { ideas, setActiveView } = useAppStore();
   const fgRef = useRef<any>();
 
-  const graphData: GraphData = React.useMemo(() => {
+  // 生成图数据
+  const graphData: GraphData = useMemo(() => {
     const nodes: GraphNode[] = ideas.map((idea) => {
+      // 根据热度计算节点大小
       const popularity = (idea.likes_count || 0) + (idea.comments_count || 0);
-      const size = Math.max(8, Math.min(35, 8 + popularity * 2.5));
+      const size = Math.max(5, Math.min(30, 5 + popularity * 2));
 
-      // 鲜艳的彩色星球
+      // 根据标签选择颜色
       const tagColors: Record<string, string> = {
-        '技术': '#2563eb', // 深蓝
-        '商业': '#16a34a', // 鲜绿
-        '设计': '#9333ea', // 紫罗兰
-        '产品': '#ea580c', // 深橙
-        '研究': '#dc2626', // 深红
-        '艺术': '#db2777', // 品红
-        '教育': '#0891b2', // 青色
-        '其他': '#6366f1', // 靛蓝
+        '技术': '#3b82f6', // 亮蓝色
+        '商业': '#22c55e', // 鲜绿色 (Restored)
+        '设计': '#a855f7', // 鲜紫色 (Restored)
+        '产品': '#f97316', // 鲜橙色 (Restored)
+        '研究': '#ef4444', // 鲜红色
+        '艺术': '#ec4899', // 粉红色
+        '教育': '#14b8a6', // 青色
+        '其他': '#64748b', // 灰蓝色
       };
       
       const mainTag = idea.tags?.[0] || '其他';
-      const color = tagColors[mainTag] || '#8b5cf6';
+      const color = tagColors[mainTag] || '#64748b';
 
       return {
         id: idea.id,
@@ -61,6 +63,7 @@ const Galaxy3D: React.FC = () => {
       };
     });
 
+    // 生成连接（基于标签相似度）
     const links: GraphLink[] = [];
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
@@ -84,112 +87,79 @@ const Galaxy3D: React.FC = () => {
     return { nodes, links };
   }, [ideas]);
 
+  // 节点点击事件
   const handleNodeClick = useCallback((node: any) => {
     console.log('Clicked node:', node.name);
   }, []);
 
-  // 创建明亮背景
+  // 创建粒子背景
   useEffect(() => {
     if (!fgRef.current) return;
 
     const scene = fgRef.current.scene();
     
-    // 天空渐变球
-    const skyGeo = new THREE.SphereGeometry(1500, 32, 32);
-    const skyMat = new THREE.ShaderMaterial({
-      uniforms: {
-        topColor: { value: new THREE.Color(0x4f9dde) },
-        bottomColor: { value: new THREE.Color(0xe0f4ff) },
-      },
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPosition.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 topColor;
-        uniform vec3 bottomColor;
-        varying vec3 vWorldPosition;
-        void main() {
-          float h = normalize(vWorldPosition).y;
-          gl_FragColor = vec4(mix(bottomColor, topColor, max(h * 0.5 + 0.5, 0.0)), 1.0);
-        }
-      `,
-      side: THREE.BackSide,
-    });
-    const sky = new THREE.Mesh(skyGeo, skyMat);
-    scene.add(sky);
-
-    // 彩色漂浮粒子
-    const particlesGeo = new THREE.BufferGeometry();
-    const particlesMat = new THREE.PointsMaterial({
-      size: 3,
-      vertexColors: true,
+    // 恢复深色背景
+    scene.background = new THREE.Color(0x000010); // 深夜蓝黑 (Slightly blue-ish dark)
+    
+    // 添加星空背景
+    const starsGeometry = new THREE.BufferGeometry();
+    const starsMaterial = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 1,
       transparent: true,
-      opacity: 0.7,
-      sizeAttenuation: true,
+      opacity: 0.8,
     });
+// ... (rest is creating stars)
 
-    const positions = [];
-    const colors = [];
-    const palette = [
-      new THREE.Color(0xff6b9d),
-      new THREE.Color(0x4facfe),
-      new THREE.Color(0x43e97b),
-      new THREE.Color(0xfeca57),
-      new THREE.Color(0xc471ed),
-    ];
 
-    for (let i = 0; i < 4000; i++) {
-      const x = (Math.random() - 0.5) * 1000;
-      const y = (Math.random() - 0.5) * 1000;
-      const z = (Math.random() - 0.5) * 1000;
-      positions.push(x, y, z);
-
-      const color = palette[Math.floor(Math.random() * palette.length)];
-      colors.push(color.r, color.g, color.b);
+    // 生成随机星星位置
+    const starsVertices = [];
+    for (let i = 0; i < 10000; i++) {
+      const x = (Math.random() - 0.5) * 2000;
+      const y = (Math.random() - 0.5) * 2000;
+      const z = (Math.random() - 0.5) * 2000;
+      starsVertices.push(x, y, z);
     }
 
-    particlesGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    particlesGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    starsGeometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(starsVertices, 3)
+    );
 
-    const particles = new THREE.Points(particlesGeo, particlesMat);
-    scene.add(particles);
+    const stars = new THREE.Points(starsGeometry, starsMaterial);
+    scene.add(stars);
 
-    // 明亮光照
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
+    // 添加环境光
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    // 添加方向光
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(100, 100, 100);
     scene.add(directionalLight);
 
   }, []);
 
   return (
-    <div className="w-full h-screen bg-gradient-to-br from-sky-200 via-blue-100 to-purple-200 relative overflow-hidden">
+    <div className="w-full h-screen bg-black relative">
       {/* 返回按钮 */}
       <button
         onClick={() => setActiveView('feed')}
-        className="absolute top-4 left-4 z-10 px-5 py-2.5 bg-white/90 backdrop-blur-sm text-gray-800 rounded-xl hover:bg-white shadow-xl transition-all font-semibold border border-white/50"
+        className="absolute top-4 left-4 z-10 px-4 py-2 bg-white/10 backdrop-blur-md text-white rounded-lg hover:bg-white/20 transition-all font-medium border border-white/10"
       >
         ← 返回
       </button>
 
       {/* 标题 */}
       <div className="absolute top-4 right-4 z-10 text-right">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent drop-shadow-sm">
-          🌈 Idea Galaxy
+        <h1 className="text-3xl font-bold text-white/90">
+          🌌 Idea Galaxy
         </h1>
-        <p className="text-gray-700 text-sm font-semibold mt-1">
-          {ideas.length} colorful ideas
+        <p className="text-white/60 text-sm">
+          {ideas.length} ideas in the universe
         </p>
       </div>
 
-      {/* 3D 图 */}
       <ForceGraph3D
         ref={fgRef}
         graphData={graphData}
@@ -198,9 +168,9 @@ const Galaxy3D: React.FC = () => {
         nodeVal="val"
         nodeOpacity={0.95}
         onNodeClick={handleNodeClick}
-        linkColor={() => 'rgba(100,100,255,0.35)'}
-        linkWidth={2.5}
-        linkOpacity={0.5}
+        linkColor={() => 'rgba(100,100,255,0.3)'}
+        linkWidth={2}
+        linkOpacity={0.4}
         backgroundColor="rgba(0,0,0,0)"
         enableNodeDrag={true}
         enableNavigationControls={true}
@@ -208,30 +178,24 @@ const Galaxy3D: React.FC = () => {
       />
 
       {/* 图例 */}
-      <div className="absolute bottom-6 left-6 z-10 bg-white/90 backdrop-blur-md rounded-2xl p-5 shadow-2xl border-2 border-white/60">
-        <h3 className="text-gray-800 font-bold mb-3 text-base flex items-center gap-2">
-          🎨 分类标签
-        </h3>
-        <div className="space-y-2.5 text-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-blue-600 shadow-lg ring-2 ring-blue-200"></div>
-            <span className="text-gray-700 font-semibold">技术</span>
+      <div className="absolute bottom-4 left-4 z-10 bg-white/10 backdrop-blur-md rounded-lg p-4 border border-white/10">
+        <h3 className="text-white font-semibold mb-2">分类标签</h3>
+        <div className="space-y-1 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+            <span className="text-white/80">技术</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-green-600 shadow-lg ring-2 ring-green-200"></div>
-            <span className="text-gray-700 font-semibold">商业</span>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            <span className="text-white/80">商业</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-purple-600 shadow-lg ring-2 ring-purple-200"></div>
-            <span className="text-gray-700 font-semibold">设计</span>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+            <span className="text-white/80">设计</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-orange-600 shadow-lg ring-2 ring-orange-200"></div>
-            <span className="text-gray-700 font-semibold">产品</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-red-600 shadow-lg ring-2 ring-red-200"></div>
-            <span className="text-gray-700 font-semibold">研究</span>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+            <span className="text-white/80">产品</span>
           </div>
         </div>
       </div>
