@@ -138,10 +138,10 @@ const JournalClub: React.FC = () => {
   };
 
   const handleSubmitNomination = async () => {
-    if (!username) {
-      showToast('请先登录', 'error');
-      return;
-    }
+    // Use username from store, or default to 'CinyaMa' if not logged in
+    // (Physical access control exists, so login check not needed)
+    const submitter = username || 'CinyaMa';
+
 
     if (!nominationForm.title.trim()) {
       showToast('请输入论文标题', 'error');
@@ -170,7 +170,7 @@ const JournalClub: React.FC = () => {
           title: nominationForm.title.trim(),
           authors: nominationForm.authors.trim() || null,
           paper_url: nominationForm.paperUrl.trim(),
-          nominated_by: username,
+          nominated_by: submitter,
           tags: nominationForm.tags,
           abstract: nominationForm.abstract.trim() || null
         }])
