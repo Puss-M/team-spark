@@ -162,7 +162,7 @@ const JournalClub: React.FC = () => {
     }
 
     setSubmitting(true);
-
+    
     try {
       const { data, error } = await supabase
         .from('paper_nominations')
@@ -179,8 +179,10 @@ const JournalClub: React.FC = () => {
       if (error) {
         console.error('Nomination error:', error);
         showToast('提名失败: ' + error.message, 'error');
+        alert('提交失败：' + error.message);
       } else {
         showToast('✅ 论文提名成功！', 'success');
+        alert('✅ 论文提名成功！请刷新页面查看。');
         setShowNominateModal(false);
         setNominationForm({
           title: '',
@@ -193,7 +195,8 @@ const JournalClub: React.FC = () => {
       }
     } catch (err) {
       console.error('Unexpected error:', err);
-      showToast('提名失败，请重试', 'error');
+      showToast('提交失败：' + String(err), 'error');
+      alert('提交失败：' + String(err));
     } finally {
       setSubmitting(false);
     }
