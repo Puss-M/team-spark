@@ -396,7 +396,7 @@ const JournalClub: React.FC = () => {
               <button
                 onClick={() => {
                   setShowNominateModal(false);
-                  setNominationForm({ title: '', authors: '', paperUrl: '', abstract: '', tags: [] });
+                  setNominationForm({ nominatorName: '', title: '', authors: '', paperUrl: '', abstract: '', tags: [] });
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
@@ -524,7 +524,7 @@ const JournalClub: React.FC = () => {
               <button
                 onClick={() => {
                   setShowNominateModal(false);
-                  setNominationForm({ title: '', authors: '', paperUrl: '', abstract: '', tags: [] });
+                  setNominationForm({ nominatorName: '', title: '', authors: '', paperUrl: '', abstract: '', tags: [] });
                 }}
                 className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
                 disabled={submitting}
