@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/useAppStore';
-import { FiCalendar, FiUser, FiThumbsUp, FiExternalLink, FiUpload, FiClock } from 'react-icons/fi';
+import { FiCalendar, FiUser, FiThumbsUp, FiExternalLink, FiUpload, FiClock, FiX } from 'react-icons/fi';
 
 interface PaperNomination {
   id: string;
@@ -34,6 +34,17 @@ const JournalClub: React.FC = () => {
   const [nominations, setNominations] = useState<PaperNomination[]>([]);
   const [sessions, setSessions] = useState<ReadingSession[]>([]);
   const [showNominateModal, setShowNominateModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Nomination form state
+  const [nominationForm, setNominationForm] = useState({
+    title: '',
+    authors: '',
+    paperUrl: '',
+    abstract: '',
+    tags: [] as string[]
+  });
+  const [tagInput, setTagInput] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -106,6 +117,86 @@ const JournalClub: React.FC = () => {
     const nextWed = new Date(today);
     nextWed.setDate(today.getDate() + daysUntilWed);
     return nextWed;
+  };
+
+  const handleAddTag = () => {
+    const tag = tagInput.trim();
+    if (tag && !nominationForm.tags.includes(tag)) {
+      setNominationForm(prev => ({
+        ...prev,
+        tags: [...prev.tags, tag]
+      }));
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setNominationForm(prev => ({
+      ...prev,
+      tags: prev.tags.filter(t => t !== tagToRemove)
+    }));
+  };
+
+  const handleSubmitNomination = async () => {
+    if (!username) {
+      showToast('请先登录', 'error');
+      return;
+    }
+
+    if (!nominationForm.title.trim()) {
+      showToast('请输入论文标题', 'error');
+      return;
+    }
+
+    if (!nominationForm.paperUrl.trim()) {
+      showToast('请输入论文链接', 'error');
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(nominationForm.paperUrl);
+    } catch {
+      showToast('请输入有效的URL', 'error');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('paper_nominations')
+        .insert([{
+          title: nominationForm.title.trim(),
+          authors: nominationForm.authors.trim() || null,
+          paper_url: nominationForm.paperUrl.trim(),
+          nominated_by: username,
+          tags: nominationForm.tags,
+          abstract: nominationForm.abstract.trim() || null
+        }])
+        .select();
+
+      if (error) {
+        console.error('Nomination error:', error);
+        showToast('提名失败: ' + error.message, 'error');
+      } else {
+        showToast('✅ 论文提名成功！', 'success');
+        setShowNominateModal(false);
+        setNominationForm({
+          title: '',
+          authors: '',
+          paperUrl: '',
+          abstract: '',
+          tags: []
+        });
+        loadNominations();
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      showToast('提名失败，请重试', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const upcomingSessions = sessions.filter(s => s.status === 'upcoming');
@@ -286,18 +377,148 @@ const JournalClub: React.FC = () => {
         )}
       </div>
 
-      {/* Nominate Modal - TODO: Implement */}
+      {/* Nominate Modal */}
       {showNominateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
-            <h3 className="text-xl font-bold mb-4">提名论文</h3>
-            <p className="text-gray-600">功能开发中...</p>
-            <button
-              onClick={() => setShowNominateModal(false)}
-              className="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-            >
-              关闭
-            </button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full my-8 shadow-2xl">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-800">📝 提名论文</h3>
+                <p className="text-sm text-gray-600 mt-1">推荐一篇值得团队阅读的论文</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowNominateModal(false);
+                  setNominationForm({ title: '', authors: '', paperUrl: '', abstract: '', tags: [] });
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <FiX size={24} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <div className="space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  论文标题 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={nominationForm.title}
+                  onChange={(e) => setNominationForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="例如：Attention Is All You Need"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Authors */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  作者列表
+                </label>
+                <input
+                  type="text"
+                  value={nominationForm.authors}
+                  onChange={(e) => setNominationForm(prev => ({ ...prev, authors: e.target.value }))}
+                  placeholder="例如：Vaswani et al."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Paper URL */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  论文链接 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="url"
+                  value={nominationForm.paperUrl}
+                  onChange={(e) => setNominationForm(prev => ({ ...prev, paperUrl: e.target.value }))}
+                  placeholder="https://arxiv.org/abs/..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">支持 arXiv, ACL Anthology, DOI 等任意链接</p>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  标签
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                    placeholder="输入标签后按回车"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={handleAddTag}
+                    className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 font-medium"
+                  >
+                    添加
+                  </button>
+                </div>
+                {nominationForm.tags.length > 0 && (
+                  <div className="flex gap-2 flex-wrap">
+                    {nominationForm.tags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm flex items-center gap-2"
+                      >
+                        {tag}
+                        <button
+                          onClick={() => handleRemoveTag(tag)}
+                          className="hover:text-indigo-900"
+                        >
+                          <FiX size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Abstract */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  摘要/简介
+                </label>
+                <textarea
+                  value={nominationForm.abstract}
+                  onChange={(e) => setNominationForm(prev => ({ ...prev, abstract: e.target.value }))}
+                  placeholder="简要描述这篇论文的主要内容和为什么值得阅读..."
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t">
+              <button
+                onClick={() => {
+                  setShowNominateModal(false);
+                  setNominationForm({ title: '', authors: '', paperUrl: '', abstract: '', tags: [] });
+                }}
+                className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                disabled={submitting}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSubmitNomination}
+                disabled={submitting || !nominationForm.title.trim() || !nominationForm.paperUrl.trim()}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {submitting ? '提交中...' : '✅ 提交提名'}
+              </button>
+            </div>
           </div>
         </div>
       )}
