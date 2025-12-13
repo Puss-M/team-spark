@@ -38,6 +38,7 @@ const JournalClub: React.FC = () => {
   
   // Nomination form state
   const [nominationForm, setNominationForm] = useState({
+    nominatorName: '',  // 新增：提名人姓名
     title: '',
     authors: '',
     paperUrl: '',
@@ -138,9 +139,10 @@ const JournalClub: React.FC = () => {
   };
 
   const handleSubmitNomination = async () => {
-    // Use username from store, or default to 'CinyaMa' if not logged in
-    // (Physical access control exists, so login check not needed)
-    const submitter = username || 'CinyaMa';
+    if (!nominationForm.nominatorName.trim()) {
+      showToast('请输入提名人姓名', 'error');
+      return;
+    }
 
 
     if (!nominationForm.title.trim()) {
@@ -170,7 +172,7 @@ const JournalClub: React.FC = () => {
           title: nominationForm.title.trim(),
           authors: nominationForm.authors.trim() || null,
           paper_url: nominationForm.paperUrl.trim(),
-          nominated_by: submitter,
+          nominated_by: nominationForm.nominatorName.trim(),
           tags: nominationForm.tags,
           abstract: nominationForm.abstract.trim() || null
         }])
@@ -185,6 +187,7 @@ const JournalClub: React.FC = () => {
         alert('✅ 论文提名成功！请刷新页面查看。');
         setShowNominateModal(false);
         setNominationForm({
+          nominatorName: '',
           title: '',
           authors: '',
           paperUrl: '',
@@ -403,6 +406,20 @@ const JournalClub: React.FC = () => {
 
             {/* Form */}
             <div className="space-y-4">
+              {/* Nominator Name */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  提名人姓名 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={nominationForm.nominatorName}
+                  onChange={(e) => setNominationForm(prev => ({ ...prev, nominatorName: e.target.value }))}
+                  placeholder="例如：CinyaMa"
+                  className="w-full px-4 py-3 border  border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
               {/* Title */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
