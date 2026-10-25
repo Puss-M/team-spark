@@ -18,6 +18,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - run: npm run lint
       - run: npm run build
         env:
           # 构建期占位值：Supabase 凭证只在运行时真正使用
